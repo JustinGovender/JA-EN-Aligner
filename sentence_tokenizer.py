@@ -28,6 +28,7 @@ def preprocess(full_text, lang):
         lines = [line for line in lines if not any(word in line for word in words_to_delete)]
         text = '\n'.join(lines)
         # Remove lenticular brackets and ideographic spaces
+        text = re.sub(r'\b\u3000\b', ' ', text)
         text = re.sub(r'[【】]|^\s*\n$|\u3000', '', text)
     elif lang == 'en':
         # Remove text that is unique to the English document

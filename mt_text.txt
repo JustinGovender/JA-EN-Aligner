@@ -1,255 +1,211 @@
-TECHNICAL FIELD Embodiments of the present invention relate to a storage device and a storage control method.
-2. Description of the Related Art In a storage device called a solid state drive (SSD) that includes a nonvolatile semiconductor memory such as a flash memory and has an interface similar to a hard disk drive (HDD), a unit of data erasing and a unit of data reading / writing are different. .
-As an example, the unit of data erasure is a physical block, and the unit of data read / write is a smaller cluster.
-One physical block includes many word lines, one word line includes many pages, and one page includes a plurality of clusters.
-In an SSD, as data rewriting progresses, the possibility that valid clusters and invalid clusters are mixed in a physical block increases.
-An effective cluster is a cluster whose physical address is specified by a logical address / physical address conversion table, and an invalid cluster is a cluster whose physical address is not specified by a logical address / physical address conversion table.
-When such physical blocks increase, the storage area cannot be used effectively.
-In order to effectively use the storage area, a process called compaction or garbage collection (hereinafter, referred to as garbage collection or GC) is performed.
-In garbage collection, in order to increase the number of free blocks from which data has been deleted, data of all valid clusters in a logical block including physical blocks in which valid clusters and invalid clusters are mixed (referred to as GC source logical blocks) is deleted. Is moved to a completed logical block (referred to as a GC destination logical block).
-All data in the GC source logical block in which data of all valid clusters has been moved to the GC destination logical block is deleted.
-The erased GC source logical block is released as a free block, and can be reused as a GC destination logical block.
-When reading data of a cluster in a GC source logical block, an error may occur in the read data and the error may not be correctable.
-In this case, it is impossible to determine whether the cluster from which data has been read is a valid cluster or an invalid cluster.
-Therefore, if a read error occurs in the data of a certain cluster and the error cannot be corrected, garbage collection cannot be performed, the data of the GC source logical block cannot be erased, and the GC source logical block is It cannot be reused as a block.
-Prior Art Documents Patent Documents Patent Document 1 JP 2013-200722 A Patent Document 2 JP 2013-174975 A Patent Document 3 U.S. Patent No. 8825946 Patent Document 4 Patent No. 6313242 Patent Document 5 U.S. Patent Application Publication In the conventional storage device, when reading data of the cluster of the GC-source logical block, when a read error occurs, and the error is uncorrectable, There is a risk that GC destination logical blocks are exhausted and garbage collection cannot be executed.
-An object of the present invention is to provide a storage device and a storage control method that can secure a GC-source logical block even when an uncorrectable read error occurs and can execute garbage collection.
-According to an embodiment, a storage device has a plurality of physical blocks, each physical block has a plurality of clusters, data is erased in units of physical blocks, and data is erased in units of clusters. A first table for storing a relationship between a nonvolatile memory to be read or written, a logical address specified by an external device, and a physical address of the nonvolatile memory corresponding to the logical address; and a plurality of nonvolatile memories. The logical blocks to which the physical blocks are allocated, the second table storing the relationship between the plurality of physical blocks, and moving data read from all valid clusters of the garbage collection source logical block to the garbage collection destination logical block, Erases all data in the garbage collection source logical block, and deletes the first And a controller for updating, comprises a.
-The controller creates a new logical block when data read from the cluster of the garbage collection source logical block is uncorrectable, and erases all data of a plurality of physical blocks assigned to the garbage collection source logical block. Then, the plurality of physical blocks from which data has been erased are allocated to the new logical blocks, and the second table is updated so that physical blocks are not substantially allocated to the garbage collection source logical blocks.
-BRIEF DESCRIPTION OF THE DRAWINGS FIG. 1 is a block diagram showing a configuration of an example of a storage device according to an embodiment;
-FIG. 2 is a diagram illustrating the relationship between physical blocks, logical blocks, and pseudo physical clusters.
-FIG. 3 is a diagram showing an example of the LUT 56.
-FIG. 4 is a flowchart showing an example of a garbage collection process.
-FIG. 5 is a diagram showing an example of a state change of the logical block table 58.
-6 is a diagram illustrating an example of garbage collection.
-7 is a diagram illustrating an example of garbage collection.
-FIG. 8 is a diagram illustrating an example of garbage collection when a GC destination logical block is exhausted.
-9 is a diagram illustrating an example of garbage collection when the GC destination logical block is exhausted.
-10 is a diagram illustrating an example of a garbage collection to avoid exhaustion of the GC destination logical block.
-FIG. 11 is a diagram illustrating an example of garbage collection for avoiding depletion of a GC destination logical block.
-FIG. 12 is a diagram illustrating another example of garbage collection for avoiding depletion of a GC destination logical block.
-FIG. 13 is a diagram illustrating another example of garbage collection for avoiding depletion of a GC destination logical block.
-BEST MODE FOR CARRYING OUT THE INVENTION Hereinafter, embodiments will be described with reference to the drawings.
-The disclosure is merely an example, and the present invention is not limited to the contents described in the following embodiments.
-Variations readily conceivable to those skilled in the art are, of course, within the scope of the disclosure.
-In order to make the description clearer, in the drawings, the size, shape, and the like of each part may be schematically represented by being changed from the actual embodiment.
-In a plurality of drawings, corresponding elements are denoted by the same reference numerals, and detailed description may be omitted.
-FIG. 1 is a block diagram illustrating a configuration of an example of the SSD 20 according to the embodiment.
-The SSD 20 is a semiconductor storage device configured to write data to a nonvolatile semiconductor memory and read data from the nonvolatile semiconductor memory.
-The SSD 20 is connected to the host 10.
-The host 10 accesses the SSD 20, writes data to the SSD 20, and reads data from the SSD 20.
-The host 10 may be a server (also referred to as a storage server) that stores a large amount of various data in the SSD 20, or may be a personal computer.
-The SSD 20 can be used as a main storage of the host 10.
-The SSD 20 may be built in the host 10, or may be connected to the host 10 via a cable or a network.
-The SSD 20 includes a controller 22, a NAND flash memory (hereinafter, referred to as a flash memory) 24, and a RAM 26.
-The controller 22 includes a host interface (I / F) 32, a CPU 34, a NAND interface (I / F) 36, and a RAM interface (I / F) 38.
-The CPU 34, the host I / F 32, the NAND I / F 36, and the RAM I / F 38 can be connected to the bus line 40.
-The controller 22 may be configured by a CPU that operates according to software, or may be configured by a circuit such as a system-on-chip (SoC), an ASIC, an FPGA, or the like.
-The host I / F 32 for electrically interconnecting the host 10 and the SSD 20 includes, for example, Small Computer System Interface (SCSI) (registered trademark), PCI Express (registered trademark) (PCIe (registered trademark) ), Serial Attached SCSI (SAS) (registered trademark), Serial Advanced Technology Attachment (SATA) (registered trademark), Non Volatile Memory Express (NVMe (registered trademark)), UniversalSeri alBus Standards such as (USB) (registered trademark) may be used, but are not limited thereto.
-The host I / F 32 functions as a circuit that receives various commands from the host 10, for example, I / O commands, various control commands, and the like.
-The I / O command may include a write command, a read command, and the like.
-The flash memory 24 as a non-volatile semiconductor memory is, for example, a NAND flash memory, but is not limited to a NAND flash memory, and may be another non-volatile semiconductor memory, for example, a NOR flash memory, an MRAM (Magnet oscillator memory). It may be composed of a Pseudo random access memory (PRAM), a phase change random access memory (PRAM), a resistive random access memory (ReRAM), or a ferroelectric random access memory (FeRAM).
-Flash memory 24 may include multiple flash memory chips (ie, multiple flash memory dies).
-Each flash memory chip includes a memory cell array including a plurality of memory cells arranged in a matrix.
-The flash memory 24 may be a two-dimensional NAND flash memory or a three-dimensional NAND flash memory.
-Each chip includes a plurality of physical blocks including a plurality of nonvolatile memory cells.
-In the flash memory 24, data is collectively erased in units of physical blocks.
-That is, the physical block is an area of a data erase unit.
-Data read / data write is performed in cluster units.
-There is a logical address (LBA) range as a concept on the logical address space corresponding to the cluster.
-One cluster includes data associated with one logical address range, or data associated with a part of one logical address range.
-Reading and writing of the flash memory 24 are controlled by the controller 22.
-The flash memory 24 is connected to the NAND I / F 36.
-One or more bits of data can be stored in a memory cell.
-Examples of flash memory configured to be able to store multiple bits per memory cell include multi-level cells (Multi-Level Cell (MLC) or Four-Level Cell) that can store 2 bits of data per memory cell. (4LC)) Flash memory, triple-level cell (Triple-LevelCell (called TLC), or Eigt-LevelCell (called 8LC)) flash capable of storing 3 bits of data per memory cell This includes a memory, a quad-level cell (referred to as QLC) or a Sixteen-Level Cell (referred to as 16LC) flash memory capable of storing 4-bit data per memory cell, and the like.
-Flash memories configured to store one bit per memory cell are referred to as single-level cell (Single-Level Cell (SLC or 2LC)) flash memories.
-The RAM 26 is composed of a volatile memory such as a DRAM or an SRAM, and may be built in the controller 22 instead of being provided outside the controller 22.
-The RAM 26 has a write buffer 52 that is a buffer area for temporarily storing data written to the flash memory 24 and a read buffer that is a buffer area for temporarily storing data read from the flash memory 24. 54, a look-up table (referred to as LUT) 56 functioning as an address conversion table (also referred to as a logical address / physical address conversion table), and a logical block table 58 indicating an assignment relationship between logical blocks and physical blocks.
-The LUT 56 manages the mapping between the logical cluster address and the pseudo physical cluster address.
-The RAM 26 is connected to the RAM I / F 38.
-The controller 22 may function as a flash translation layer (FTL) configured to perform data management and block management of the flash memory 24.
-The data management performed by the FTL includes (1) management of mapping information indicating a correspondence between a logical address (logical cluster address) of the SSD 20 and a physical address (pseudo physical cluster address) of the flash memory 24, 2) Processing for hiding read / write in cluster units and erase operation in block units is included.
-The logical address is an address specified by the host 10 to address the SSD 20.
-Management of the mapping between the logical address and the physical address is performed using the LUT 56.
-The controller 22 uses the LUT 56 to manage the mapping between the logical address and the physical address in cluster size units.
-The physical address corresponding to a certain logical address indicates a physical storage position in the flash memory 24 to which data specified by the logical address has been written.
-The LUT 56 may be loaded from the flash memory 24 to the RAM 26 when the power of the SSD 20 is turned on.
-The CPU 34 can function as a read control unit 42, a write control unit 44, a garbage collection (GC) control unit 46, and the like.
-Note that some or all of the read control unit 42, the write control unit 44, and the GC control unit 46 may be realized by dedicated hardware in the controller 22.
-The write control unit 44 performs error correction encoding of the write data, and writes the encoded data to the flash memory 24.
-The read control unit 42 performs error correction decoding on data read from the flash memory 24, and corrects errors in the read data.
-The error correction encoding and the error correction decoding may be realized by dedicated hardware in the controller 22.
-The GC control unit 46 executes garbage collection at appropriate timing.
-The write control unit 44 writes the update data corresponding to a certain logical address to another cluster instead of the cluster specified by the physical address corresponding to this logical address.
-Then, the write control unit 44 updates the LUT 56 and associates this logical address with a physical address designating this another cluster.
-As a result, the previous data is not read, and the cluster storing the previous data is invalidated.
-Block management includes bad block management, wear leveling, garbage collection, and the like.
-The CPU 34 is a processor configured to control the host I / F 32, the NAND I / F 36, and the RAM I / F 38.
-The CPU 34 performs various processes by executing a control program (firmware) stored in a not-shown ROM or the like.
-The CPU 34 can execute command processing for processing various commands from the host 10 in addition to the above-described FTL processing.
-The operation of the CPU 34 is controlled by the above-described firmware executed by the CPU 34.
-Note that part or all of the FTL processing and command processing may be executed by dedicated hardware in the controller 22.
-FIG. 2 is a diagram illustrating the relationship between physical blocks, logical blocks, and pseudo physical clusters.
-As described above, the NAND chip includes a plurality of physical blocks, and the plurality of physical blocks are allocated to one logical block.
-The plurality of physical blocks allocated to one logical block may be a plurality of physical blocks included in a single chip or a plurality of physical blocks included in different chips.
-The number of physical blocks allocated to one logical block may be constant regardless of the logical block, or may be different depending on the logical block.
-A plurality of pseudo physical clusters are assigned to one logical block.
-Information stored in one pseudo physical cluster includes user data (for example, 4 KiB) and a redundant part (for example, 12 bytes).
-The redundant part includes a logical cluster address and other information.
-The pseudo physical cluster address includes information indicating which logical block the pseudo physical cluster is included in, and the number of the pseudo physical cluster from the first pseudo physical cluster in the logical block, that is, the pseudo physical cluster. Indicating the relative position in the logical block.
-When accessing the pseudo physical address, the host 10 specifies a logical cluster address.
-The physical address corresponding to the logical address, that is, information indicating the mapping between the logical cluster address and the pseudo physical cluster address is stored in the LUT 56.
-FIG. 3 shows an example of the LUT 56.
-The LUT 56 stores the pseudo physical cluster address, and the index of the pseudo physical cluster address corresponds to the logical cluster address.
-The logical cluster address is represented by index × cluster size (4 KiB).
-4KiB is a logical cluster size, and a physical cluster size is 4KiB + 12Bytes.
-When the index is obtained by dividing the logical cluster address given by the host 10 by the cluster size, a pseudo physical cluster address corresponding to the logical cluster address is obtained.
-For example, if the logical cluster address in the redundant part in the information stored in the pseudo physical cluster A specified by the pseudo physical cluster address PC3 of the index 3 corresponds to the index 3, the pseudo physical cluster A is a valid cluster. It is.
-Similarly, when the logical cluster address in the redundant part in the information stored in the pseudo physical cluster B specified by the pseudo physical cluster address PCm of the index m corresponds to the index m, the pseudo physical cluster B is valid. It is a cluster.
-On the other hand, the pseudo physical cluster C not specified from the LUT 56 is an invalid cluster.
-As described above, by examining all the pseudo physical cluster addresses of the LUT 56, it is possible to determine whether the pseudo physical cluster is a valid cluster or an invalid cluster. Or invalid cluster.
-For example, the pseudo physical cluster address of the pseudo physical cluster D is PCd, the logical cluster address of the redundant part of the pseudo physical cluster D is LCd, and the pseudo physical cluster address corresponding to the logical cluster address LCd in the LUT 56 is PCe. And
-When the pseudo physical cluster addresses PCd and PCe are equal, it can be determined that the pseudo physical cluster D is a valid cluster, and when the pseudo physical cluster addresses PCd and PCe are not equal, it can be determined that the pseudo physical cluster D is an invalid cluster.
-In other words, if the pseudo physical cluster address corresponding to the logical cluster address in the information stored by the pseudo physical cluster address specified by a certain pseudo physical cluster address of the LUT 56 matches the above pseudo physical cluster, the pseudo physical cluster is a valid cluster. If they do not match, the pseudo physical cluster is an invalid cluster.
-For example, when a command to write the data DA1 to a certain logical cluster address LC1 is transmitted from the host 10, the write control unit 44 sends the data DA1 to one of the pseudo physical clusters (the pseudo physical cluster address of this cluster is PC1). To write.
-The write control unit 44 sets the mapping between the logical cluster address LC1 and the pseudo physical cluster address PC1 in the LUT 56.
-Thereafter, when a write command for overwriting the data DA2 with respect to the logical cluster address LC1 is transmitted from the host 10, the write control unit 44 transmits a pseudo physical cluster other than the previous pseudo physical cluster (this The data DA2 is written to the pseudo physical cluster address PC2).
-The write control unit 44 sets the mapping between the logical cluster address LC1 and the pseudo physical cluster address PC2 in the LUT 56.
-As a result, the pseudo physical cluster address PC1 is no longer specified from the LUT 56, and the pseudo physical cluster to which the data DA1 has been written (the pseudo physical cluster address is PC1) becomes an invalid cluster, and the data DA1 becomes invalid data.
-As described above, invalid clusters are generated due to overwriting of data, and when physical blocks in which valid clusters and invalid clusters coexist increase, garbage is allocated to logical blocks including such physical blocks in order to effectively utilize the storage area. Collection processing is performed.
-FIG. 4 is a flowchart illustrating an example of the garbage collection process.
-The controller 22 (including the read control unit 42, the write control unit 44, and the GC control unit 46) determines in block 102 whether or not it is time to start garbage collection.
-The controller 22 can determine whether it is time to start garbage collection based on whether a garbage collection command has been received from the host 10.
-Also, since the controller 22 manages the state of the block, the controller 22 detects whether the number of physical blocks in which valid clusters and invalid clusters coexist has increased, and determines whether or not it is time to start garbage collection. Can be determined.
-The controller 22 repeats the determination of the block 102 until it determines that it is time to start garbage collection.
-When the controller 22 determines that the start timing of the garbage collection has been reached in the block 102, one of the logical blocks of the target candidate of the garbage collection including the physical block in which the valid cluster and the invalid cluster are mixed (block 104). Data is read from one pseudo physical cluster (referred to as GC source logical block).
-The read data is stored in the read buffer 54.
-In block 106, the controller 22 determines whether the data read in block 104 includes an uncorrectable read error.
-When the read data includes a read error, the controller 22 corrects the read error.
-However, some errors cannot be corrected by the controller 22 depending on the type and degree of the errors.
-Since a cluster that generates a read error and stores data whose error cannot be corrected cannot be determined as a valid cluster or an invalid cluster, the data of the pseudo physical cluster cannot be moved to the GC-destination logical block.
-When the controller 22 determines in block 106 that the read data includes an uncorrectable read error, the controller 22 manages the pseudo physical cluster as a logical unknown cluster in block 108.
-If the controller 22 determines in block 106 that the read data does not include an uncorrectable read error, the controller 22 determines in block 110 whether the pseudo-physical cluster is a valid cluster.
-This determination is performed based on where in the LUT 56 the logical cluster address of the redundant part of the pseudo physical cluster points, as described above.
-If the controller 22 determines that the pseudo physical cluster is a valid cluster in block 110, the controller 22 writes data read from the valid cluster stored in the read buffer 54 to the pseudo physical cluster of the GC destination logical block in block 112.
-The GC destination logical block is selected from logical blocks from which all data has been erased (also referred to as free blocks).
-When the writing of the data to the GC destination logical block is completed in block 112, the pseudo physical cluster address in the GC source logical block in the LUT 56 is changed to the pseudo physical cluster address in the GC destination logical block, and the LUT 56 is updated.
-After executing the processing of block 108 or block 112, or when determining in step 110 that the pseudo physical cluster is an invalid cluster, the controller 22 extracts data from all pseudo physical clusters in the GC source logical block in block 114. It is determined whether or not a read has been performed.
-If the controller 22 determines in the block 114 that data has not been read from all the pseudo physical clusters in the GC source logical block, the controller 22 executes the block 104 again.
-That is, the controller 22 reads data from another pseudo physical cluster in the GC source logical block, and repeats the same processing.
-If the controller 22 determines in block 114 that data has been read from all pseudo physical clusters in the GC source logical block, the controller 22 determines in block 116 whether the GC source logical block includes a logic unknown cluster.
-If the GC-source logical block does not include a logical unknown cluster, it can be determined that all data of the valid cluster in the GC-source logical block has been moved to the GC-destination logical block, and that the GC-source logical block can be erased.
-If the GC-source logical block includes a logically unknown cluster, it is unknown whether all data of the valid cluster has been moved to the GC-destination logical block, and it can be determined that the GC-source logical block cannot be erased.
-Therefore, when the controller 22 determines in the block 116 that the GC-source logical block does not include the logical unknown cluster, the controller 22 erases the data of all the physical blocks of the GC-source logical block in a block 118.
-In block 122, the controller 22 sets the GC source logical block from which all data has been erased in block 118 as a candidate for the GC destination logical block, and ends the process.
-If the controller 22 determines in block 116 that the GC-source logical block includes a logically unknown cluster, the controller 22 creates a new logical block in block 124 and erases data of all physical blocks allocated to the GC-source logical block. Then, the physical block from which data has been erased is assigned to the new logical block.
-In block 126, the controller 22 sets the GC source logical block as a logical unknown block to which no physical block is allocated.
-For example, the controller 22 sets all physical blocks allocated to the GC-source logical block as non-existent physical blocks.
-When the logical block table 58 indicates the physical address of the physical block allocated to the logical block, an address not used as the physical address is written in the physical block column allocated to the GC source logical block in the logical block table 58.
-As a result, when the host 10 attempts to read data in the logically unknown cluster, the data cannot be read because a pseudo physical cluster address corresponding to the logically unknown cluster address does not exist, and a read error is returned to the host 10.
-In block 128, the controller 22 sets the new logical block as a candidate for the GC destination logical block, and ends the processing.
-Note that the execution order of the blocks 126 and 128 may be reversed from that in FIG.
-Although FIG. 4 illustrates an example in which the processing ends after block 128, the determination processing in block 102 is periodically executed, and when the garbage collection start timing comes, the processing in FIG. 4 is executed as an interrupt. May be.
-The creation of a new logical block will be described with reference to FIG.
-FIG. 5 shows an example of a state change of the logical block table 58 indicating the assignment relationship between the logical block addresses and the physical block addresses.
-FIG. 5A shows the logical block table 58 before the execution of the block 124, for example, during the execution of the block 116.
-FIG. 5B shows the logical block table 58 when the processing of the block 124 is completed.
-FIG. 5C shows the logical block table 58 when the processing of the block 126 is completed.
-It is assumed that (m + 1) logical blocks (logical blocks of logical block addresses LB0 to LBm) have been created.
-The physical block specified by the physical block addresses PB0, PB1,... Is assigned to the logical block indicated by the logical block address LB0, and the physical block addresses PBi, PBi + 1,. .. Are assigned.
-In FIG. 5, a physical block of a continuous physical block address is allocated to a logical block. However, this is merely an example, and even if a physical block of an arbitrary discrete physical block address is allocated to the logical block. good.
-It is assumed that the logical block of the logical block address LBm is a GC source logical block (logical unknown block) including a logically unknown cluster.
-It is assumed that the logical block address of the new logical block created in block 124 is LBm + 1, as shown in FIG.
-As shown in FIG. 5C, the controller 22 addresses the physical block addresses of all the physical blocks corresponding to the GC source logical block specified by the logical block address LBm in the logical block table 58, as shown in FIG. Is a value that cannot exist as Null.
-As a result, the GC source logical block is an unknown physical block.
-An example of Null is "FF" for a 16-bit address.
-As a result, when the host 10 attempts to read data in the logically unknown cluster, the data of the pseudo physical cluster corresponding to the logically unknown cluster cannot be read, and a read error is returned to the host 10.
-At the timing of block 124, all the data of the valid cluster in the GC source logical block of the logical block address LBm has been moved to the GC destination logical block, and the data remaining in the GC source logical block is only the data of the logical unknown cluster. The data in the GC-source logical block is data that will not be read by the host 10 in the future or data that will not be returned to the host 10.
-That is, the physical block allocated to the GC source logical block is an erasable physical block because it is not used in the future.
-For this reason, in the block 124, the data of the physical block specified by the physical block addresses PBi, PBi + 1,... Assigned to the CG source logical block specified by the logical block address LBm is erased. Are assigned to the new logical block, and the erased new logical block can be used as the GC destination logical block.
-As a result, even if there is a cluster of unknown logic, an erased GC destination logical block required for the garbage collection process can be secured, and a state in which the garbage collection process cannot be executed can be avoided.
-Hereinafter, an operation example of the garbage collection for each specific situation will be described.
-6 and 7 show an example in which the GC destination logical blocks are sequentially generated and the garbage collection is continuously executed.
-The logical blocks BL0, BL1, BL2, BL4,... Have been programmed, and the logical block BL3 has been erased.
-“Programmed” means that data has been written to such an extent that there is no room for writing new data.
-The erased logical block BL3 can be a GC destination logical block.
-Assume that valid clusters and invalid clusters are mixed in the programmed logical blocks BL0, BL1, BL2, BL4,..., And these logical blocks BL0, BL1, BL2, BL4,.
-First, as shown in FIG. 6A, one of the candidates for the GC-source logical block, for example, the logical block BL0 is set as the GC-source logical block, and data is read from the GC-source logical block BL0 in units of pseudo physical clusters. If the pseudo physical cluster is a valid cluster, the read data is moved to the GC-destination logical block BL3.
-The state of the GC destination logical block BL3 changes from being erased to during programming.
-When the data read from all the valid clusters of the GC source logical block BL0 is moved to the GC destination logical block BL3, all the data of the GC source logical block BL0 is erased as shown in FIG. 6 (b).
-The erased logical block BL0 can be a GC destination logical block.
-Next, as shown in FIG. 6 (c), another one of the candidates of the GC-source logical block, for example, the logical block BL1 is set as the GC-source logical block, and the pseudo-physical cluster unit from the GC-source logical block BL1. When data is read and the pseudo physical cluster is a valid cluster, the read data is moved to the GC destination logical block BL3.
-When the amount of data moved (written) to the GC destination logical block BL3 increases, the state of the GC destination logical block BL3 becomes programmed, as shown in FIG. Data cannot be moved to GC destination logical block BL3.
-However, since there is an erased logical block BL0 that can be a GC destination logical block, thereafter, as shown in FIG. 7 (b), data read from the valid cluster of the GC source logical block BL1 is It moves to block BL0 and garbage collection continues.
-When data is read from all valid clusters in the GC source logical block BL1 and data is moved to the GC destination logical block BL0, all data in the GC source logical block BL1 is erased as shown in FIG. 7 (c). Is done.
-The erased logical block BL1 can be a GC destination logical block.
-Thus, the garbage collection is continued as long as the erased logical block is newly generated.
-Next, an example in which the execution of the garbage collection cannot be continued will be described with reference to FIGS.
-As in the case of FIG. 6 (a), as shown in FIG. 8 (a), data read from the valid cluster of the GC source logical block BL0 is moved to the GC destination logical block BL3, and garbage collection is executed.
-As shown in FIG. 8 (b), if data read from the pseudo physical cluster of the GC source logical block BL0 includes a read error during the garbage collection and the read error cannot be corrected, the cluster is a valid cluster. It cannot be determined that the cluster is an invalid cluster, and data read from the cluster cannot be moved to the GC-destination logical block BL3.
-When the data read from all the valid clusters of the GC source logical block BL0 is moved to the GC destination logical block BL3, the logical block BL1 is set as the GC source logical block as shown in FIG. Data read from the valid cluster of the block BL1 is moved to the GC destination logical block BL3.
-When the amount of data written to the GC destination logical block BL3 increases, the state of the GC destination logical block BL3 becomes programmed, as shown in FIG. Data cannot be moved to block BL3.
-In the examples shown in FIGS. 6 and 7, since the erased logical block BL0 exists at this stage (FIG. 7A), the garbage collection for the GC-source logical block BL1 can be continued.
-However, as shown in FIG. 9 (a), when the state of the GC destination logical block BL3 becomes programmed, there is no erased logical block, so as shown in FIG. 9 (b), There is no GC destination logical block to which data read from the valid cluster of the GC source logical block BL1 is moved, and it is impossible to continue garbage collection any more.
-Note that after the occurrence of the uncorrectable read error shown in FIG. 8 (b), the state of the GC destination logical block BL3 shown in FIG. 9 (a) becomes programmed and there is no erased logical block. If the correspondence between all the logical addresses and the physical addresses of the LUT 56 is checked during the period until the state becomes uncorrected, the pseudo-physical cluster storing the data in which the uncorrectable read error has occurred is a valid cluster or an invalid cluster. Can be determined.
-However, if the size of the LUT 56 is large, it is impossible to check the correspondence between all logical addresses and physical addresses of the LUT 56 during this period.
-In order to avoid such a situation, it is conceivable to prepare in advance a large number of erased logical blocks that can be GC destination logical blocks.
-FIG. 10 and FIG. 11 show examples of garbage collection when an erased logical block is prepared in advance.
-The logical blocks BL0, BL1, BL2, BL4,... Have been programmed, and the logical blocks BL3, eBL0, eBL1,.
-The erased logical blocks eBL0, eBL1,... Are used only as CG destination logical blocks and are not used for storing user data.
-The erased logical blocks eBL0, eBL1,... May be logical blocks in which no user data has been stored, or may have stored user data. May be a logical block not used.
-As shown in FIG. 10A, the data read from the valid cluster of the GC source logical block BL0 is moved to the GC destination logical block BL3.
-The state of the GC destination logical block BL3 changes from being erased to during programming.
-As shown in FIG. 10B, when data read from the pseudo physical cluster of the GC source logical block BL0 during the garbage collection is uncorrectable, the read data cannot be moved to the GC destination logical block BL3.
-When the data read from all the valid clusters of the GC source logical block BL0 is moved to the GC destination logical block BL3, the logical block BL1 is set as the GC source logical block, as shown in FIG. Data read from the valid cluster of the block BL1 is moved to the GC destination logical block BL3.
-If the amount of data written to the GC destination logical block BL3 increases, the state of the GC destination logical block BL3 becomes programmed as shown in FIG. Data cannot be moved to block BL3.
-In the examples shown in FIGS. 8 and 9, as shown in FIGS. 9A and 9B, when the state of the GC-destination logical block BL3 becomes programmed, no erased logical block exists. No garbage collection could be continued because there were no.
-However, in the examples shown in FIGS. 10 and 11, since the erased logical blocks eBL0, eBL1,... Which can be used as the GC destination logical blocks are prepared in advance, the garbage collection can continue even if a logical unknown block occurs. It is.
-That is, as shown in FIG. 11 (a), when the state of the GC destination logical block BL3 changes from being programmed to programmed, as shown in FIG. 11 (b), the erased logical block eBL0 becomes the GC destination logical block. The data read from the valid cluster of the GC source logical block BL1 is moved to the GC destination logical block eBL0, and the garbage collection is continued.
-When data is read from all valid clusters of the GC source logical block BL1 and data is moved to the GC destination logical block eBL0, all data of the GC source logical block BL1 is erased as shown in FIG. 11 (c). Is done.
-The erased logical block BL1 can be a GC destination logical block.
-As described above, by preparing the erased logical block in advance, even if a logical unknown block occurs, the possibility that the GC destination logical block is exhausted is reduced.
-However, there is a disadvantage that the storage cost of the flash memory is increased due to the erased logical block prepared in advance.
-In the examples of FIGS. 10 and 11, the period for checking the correspondence between all logical addresses and physical addresses of the LUT 56 and determining whether the logical unknown block is a valid cluster or an invalid cluster is shown in FIG. This is the period from the occurrence of the uncorrectable read error shown in b) to the disappearance of any erased logical block.
-For this reason, compared to the case shown in FIGS. 8 and 9, the time is longer, and there is a time margin for examining the LUT 56 to determine whether the logical unknown block is a valid cluster or an invalid cluster. FIG. 13 shows a garbage collection operation that can prevent the GC destination logical block from being exhausted without preparing an erased logical block in advance.
-As shown in FIG. 12A, data read from the valid cluster of the GC source logical block BL0 is moved to the GC destination logical block BL3.
-As shown in FIG. 12 (b), when data read from the GC-source logical block BL0 cannot be corrected during the garbage collection, it cannot be determined whether the cluster is a valid cluster or an invalid cluster, and the data is read from the cluster. Data cannot be moved to GC destination logical block BL3.
-When data read from all valid clusters of the GC source logical block BL0 is moved to the GC destination logical block BL3, a new logical block nBL0 is generated as shown in FIG. 12 (c).
-The physical block allocated to the new logical block nBL0 is the physical block allocated to the GC-source logical block BL0, and its data has been erased.
-At the same time, the GC-source logical block BL0 is changed to a logical unknown block to which no physical block is assigned.
-Further, as shown in FIG. 12 (c), the logical block BL1 is set as a GC source logical block, and data read from a valid cluster of the GC source logical block BL1 is moved to the GC destination logical block BL3.
-When the data written to the GC destination logical block BL3 increases, as shown in FIG. 13 (a), the state of the GC destination logical block BL3 becomes programmed, and data is transferred from the GC source logical block BL1 to the GC destination logical block BL3. Will be unable to move.
-However, since the erased logical block nBL0 exists, even if a logical unknown block including a logical unknown cluster occurs, the GC destination logical block nBL0 can be secured, and as shown in FIG. Data read from the valid cluster is moved to the GC destination logical block nBL0.
-When an uncorrectable read error does not occur during data reading of the GC source logical block BL1 and all data of the valid cluster of the GC source logical block BL1 is moved to the GC destination logical block nBL0, as shown in FIG. Thus, all data of the GC source logical block BL1 is erased, and the erased logical block BL1 can be a GC destination logical block.
-According to the operations in FIGS. 12 and 13, when data is read from the pseudo physical cluster of the GC source logical block in the garbage collection, a read error occurs, and if the read error cannot be corrected, the GC source logical block is enabled. After data is moved from the cluster to the GC destination logical block, a new logical block is created.
-After erasing the data of the physical block allocated to the GC source logical block, the erased physical block is allocated to the new logical block.
-Thereby, the erased GC destination logical block can be secured.
-The GC source logical block is a logical unknown block to which no physical block is assigned.
-Since the data of the valid cluster of the GC source logical block is moved to the GC destination logical block, when a read command related to this data is transmitted from the host 10 to the controller 22 thereafter, the LUT 56 is set to the pseudo physical cluster in the GC destination logical block. Or, since it indicates a physical block, data is read from a pseudo physical cluster or a physical block in the GC destination logical block.
-The data of invalid clusters and unknown logical clusters in the GC original logical block remain in the GC original logical block, but since the physical blocks are no longer allocated to the GC original logical block, data read from invalid clusters and logical unknown clusters will be performed thereafter. When the command is transmitted from the host 10 to the controller 22, the data is not read, and a read error is returned to the host 10.
-In the controller 22, a physical read error indicating a pseudo physical cluster in which the LUT 56 does not exist is distinguished from a read error including an error in which data cannot be corrected. There is no distinction between the two errors.
-The reason that a read error is returned in response to a read request related to a logical unknown cluster is the same even when a new logical block is not created.
-Therefore, when an uncorrectable read error occurs, the operation of the SSD 20 as viewed from the host 10 is the same whether a new logical block is created or a new logical block is created.
-According to the operations in FIGS. 12 and 13, there is no need to provide an erased logical block that can be used as a GC destination logical block in order to cope with a situation in which data of a GC source logical block including a logical unknown cluster cannot be erased.
-When the size of one logical block is increased, the number of logical blocks is reduced, so that the GC-destination logical block is easily exhausted.
-However, as shown in FIGS. 12 and 13, when a logic-unknown block occurs, a new logic block is created, so that the CG-destination logic block is hardly depleted.
-Note that the present invention is not limited to the above-described embodiment as it is, and can be embodied by modifying constituent elements without departing from the gist thereof in an implementation stage.
-Various inventions can be formed by appropriately combining a plurality of constituent elements disclosed in the above embodiments.
-For example, some components may be deleted from all the components shown in the embodiment.
-Further, components of different embodiments may be appropriately combined.
-Description of symbols 10 ... Host, 20 ... SSD, 22 ... Controller, 24 ... NAND flash memory, 26 ... RAM, 42 ... Read control unit, 44 ... Write control unit, 46 ... GC control unit, 56 ... LUT, 58 ... Logical block table.
-Document name Claims Claims have a plurality of physical blocks, each physical block has a plurality of clusters, data is erased in units of physical blocks, and data is read or written in units of clusters. A first table that stores a relationship between a logical address specified by a device and a physical address of the nonvolatile memory corresponding to the logical address, a logical block to which a plurality of physical blocks of the nonvolatile memory are assigned, The second table that stores the relationship with a plurality of physical blocks, and data read from all valid clusters of the garbage collection source logical block is moved to the garbage collection destination logical block, and all data of the garbage collection source logical block are moved. Erasing and updating the first table. When the data read from the cluster of the garbage collection source logical block is uncorrectable, the controller creates a new logical block and deletes all data of a plurality of physical blocks allocated to the garbage collection source logical block. A storage device for erasing, allocating the plurality of physical blocks from which data has been erased to the new logical block, and updating the second table so that a physical block is not substantially allocated to the garbage collection source logical block.
-The controller updates the second table by allocating a physical block that cannot exist in the garbage collection source logical block so that a physical block is not substantially allocated to the garbage collection source logical block. A storage device as described.
-A plurality of pseudo physical clusters are assigned to the logical block, one of the plurality of pseudo physical clusters stores user data and a logical cluster address, and the logical cluster address is the one pseudo physical cluster. The first table stores a pseudo physical cluster address corresponding to the logical cluster address, and the pseudo physical cluster address is the plurality of logical blocks including the one pseudo physical cluster. 2. The storage device according to claim 1, wherein the storage device includes information that specifies a relative position of the one pseudo physical cluster in the specified logical block.
-The controller moves data read from the effective pseudo physical cluster of the garbage collection source logical block to the pseudo physical cluster of the garbage collection destination logical block, and stores the data in the logical address corresponding to the effective pseudo physical cluster in the first table. 4. The storage device according to claim 3, wherein the corresponding pseudo physical cluster address is changed to the address of the pseudo physical cluster of the garbage collection destination logical block.
-When the second pseudo physical cluster address corresponding to the first logical cluster address stored by the first pseudo physical cluster specified by the first pseudo physical cluster address in the first table is equal to the first pseudo physical cluster address, The first pseudo physical cluster is an effective pseudo physical cluster, and if the second pseudo physical cluster address is not equal to the first pseudo physical cluster address, the first pseudo physical cluster is an invalid pseudo physical cluster. 5. Storage device.
-The controller, after updating the second table, receives, from the external device, a read command related to the cluster of the garbage collection source logical block in which the read data is uncorrectable, and transmits information indicating a read error to the external device. 2. The storage device according to claim 1, wherein the storage device sends a reply.
-It has a plurality of physical blocks, each physical block has a plurality of clusters, data is erased in physical block units, and data is read or written in cluster units. An address, a first table storing a relationship between physical addresses of the nonvolatile memory corresponding to the logical addresses, a logical block to which a plurality of physical blocks of the nonvolatile memory are assigned, and a The second table that stores the relationship and data read from all valid clusters of the garbage collection source logical block are moved to the garbage collection destination logical block, and all data of the garbage collection source logical block are erased. And a controller for updating the table. The method, if the data read from the cluster of the garbage collection source logical block is uncorrectable, the controller creates a new logical block and creates a new logical block of the plurality of physical blocks assigned to the garbage collection source logical block. Erasing all data, allocating the plurality of physical blocks from which data has been erased to the new logical block, and updating the second table so that physical blocks are not substantially allocated to the garbage collection source logical block Memory control method.
-8. The controller according to claim 7, wherein the controller allocates a physical block that cannot exist in the garbage collection source logical block, thereby updating the second table so that a physical block is not substantially allocated to the garbage collection source logical block. The storage control method according to the above.
-A plurality of pseudo physical clusters are assigned to the logical block, one of the plurality of pseudo physical clusters stores user data and a logical cluster address, and the logical cluster address is the one pseudo physical cluster. The first table stores a pseudo physical cluster address corresponding to the logical cluster address, and the pseudo physical cluster address is the plurality of logical blocks including the one pseudo physical cluster. 8. The storage control method according to claim 7, wherein the storage control method includes information that specifies the relative position of the one pseudo physical cluster in the specified logical block.
-By the controller, data read from the effective pseudo physical cluster of the garbage collection source logical block is moved to the pseudo physical cluster of the garbage collection destination logical block, and the logical address corresponding to the effective pseudo physical cluster of the first table is moved to 10. The storage control method according to claim 9, wherein the corresponding pseudo physical cluster address is changed to the address of the pseudo physical cluster of the garbage collection destination logical block.
-When the second pseudo physical cluster address corresponding to the first logical cluster address stored by the first pseudo physical cluster specified by the first pseudo physical cluster address in the first table is equal to the first pseudo physical cluster address, 10. The first pseudo physical cluster is a valid pseudo physical cluster, and if the second pseudo physical cluster address is not equal to the first pseudo physical cluster address, the first pseudo physical cluster is an invalid pseudo physical cluster. Storage control method.
-The controller, after updating the second table, receives, from the external device, a read command related to the cluster of the garbage collection source logical block in which the read data is uncorrectable, and transmits information indicating a read error to the external device. 8. The storage control method according to claim 7, wherein a reply is made.
-Abstract: Provided is a storage device and a storage control method capable of securing a GC source logical block and executing garbage collection even if an uncorrectable read error occurs.
-According to an embodiment, a storage device includes a non-volatile memory, a first table storing a relationship between a logical address specified by an external device and a physical address of the non-volatile memory, a logical block and a plurality of physical blocks. And a controller for updating the first table by garbage collection.
-If the data read from the cluster of the GC source logical block is uncorrectable, the controller creates a new logical block, erases all data in multiple physical blocks assigned to the GC source logical block, and erases the data The allocated plurality of physical blocks are allocated to the new logical block, and the second table is updated so that the physical block is not substantially allocated to the GC-source logical block.
+(TITLE OF THE INVENTION) Image Forming Apparatus and Image Forming Method Field of the Invention A light emitting element included in an image forming apparatus is degraded by emitting light, and the light emission amount is reduced.
+When the light emission amount decreases, the light emission amount of each light emitting element becomes non-uniform, and the printing quality deteriorates.
+Therefore, it is desirable that the light emission amount of each light emitting element is maintained uniformly.
+As a method therefor, there has been proposed a method of uniformly adjusting the light emission amount of the entire light emitting element.
+For example, a method of controlling the driving current of each light emitting element based on the measured light emission amount of each light emitting element at the time of light emission.
+A method of controlling a driving current of each light emitting element based on the cumulative driving time of each light emitting element and characteristic data of a light emission amount.
+Data opposite to the data for forming an electrostatic latent image is created, and each light emitting element emits light.
+This is a method of making the light emitting time of each light emitting element uniform.
+However, increasing the light emission amount of the light emitting element by the driving current further accelerates the deterioration of the light emitting element.
+Also, forcibly causing the light emitting element to emit light in order to make the light emitting time of the light emitting element uniform may sometimes accelerate the deterioration of the light emitting element.
+BRIEF DESCRIPTION OF THE FIG. 1 is an external view showing an example of the overall configuration of an image forming apparatus 100 according to an embodiment.
+FIG. 2 is a functional block diagram illustrating a functional configuration of a light emitting unit 305 of the embodiment.
+FIG. 3 is an external view illustrating a specific example of a configuration of a light emitting unit 305 of the embodiment.
+FIG. 4 is a diagram showing a specific example of storing each accumulated light emission time of the light emitting element 306 stored in the light emission time storage unit 301 of the embodiment. FIG. 5 is a diagram showing whether the light emitting element 306 of the embodiment emits light. The flowchart which judges.
+FIG. 6 is a flowchart for determining whether or not to cause the light emitting element 306 of the embodiment to emit light.
+FIG. 7 is a flowchart showing a flow of processing when the light emitting element 306 of the embodiment is caused to emit light forcibly.
+FIG. 8 is a flowchart showing the flow of processing when the light emitting element 306 of the embodiment is forcibly emitting light.
+FIG. 9 is a diagram showing the accumulated light emission time of the light emitting element 306 when the image data (A) is printed.
+FIG. 10 is a diagram showing the accumulated light emission time of the light emitting element 306 after printing five sets of image data (A).
+FIG. 11 is a diagram showing a state in which the accumulated light emission time of the light emitting element 306 has reached the adjustment time after printing five copies of the image data (A).
+FIG. 12 is a diagram showing the accumulated light emission time of the light emitting element 306 when the image data (B) is printed.
+FIG. 13 is a diagram showing the accumulated light emission time of the light emitting element 306 after printing 15 sets of image data (B).
+FIG. 14 is a diagram showing a state where the accumulated light emission time of the light emitting element 306 has reached the adjustment time after printing 15 copies of image data (B).
+DETAILED DESCRIPTION The image forming apparatus according to the embodiment has a light emitting unit, an adjustment time storage unit, and a light emission control unit.
+The light emitting section includes a plurality of light emitting elements for forming an electrostatic latent image on the photosensitive drum.
+The adjustment time storage unit stores an adjustment time that is shorter than the accumulated light emission time of the light emitting element having the longest accumulated light emission time.
+The light emission control unit is configured to, when the difference between the cumulative light emission time of one light emitting element and the cumulative light emission time of the other light emitting element among the plurality of light emitting elements satisfies a predetermined condition, adjust the adjustment time stored in the adjustment time storage unit. Control is performed such that the light-emitting element emits light up to the adjustment time for the light-emitting element having a shorter cumulative light-emitting time.
+FIG. 1 is an external view showing an overall configuration example of an image forming apparatus 100 according to the embodiment.
+The image forming apparatus 100 is, for example, a multifunction peripheral.
+The image forming apparatus 100 includes a display 110, a control panel 120, a printer unit 130, a sheet storage unit 140, and an image reading unit 200.
+Note that the printer unit 130 of the image forming apparatus 100 may be a device that fixes a toner image.
+The image forming apparatus 100 forms an image on a sheet using a developer such as a toner.
+The sheet is, for example, paper or label paper.
+The sheet may be any sheet as long as the image forming apparatus 100 can form an image on its surface.
+The display 110 is an image display device such as a liquid crystal display and an organic EL (Electro Luminescence) display.
+The display 110 displays various information related to the image forming apparatus 100.
+The control panel 120 has a plurality of buttons.
+Control panel 120 accepts user operations.
+Control panel 120 outputs a signal corresponding to an operation performed by the user to a control unit of image forming apparatus 100.
+The display 110 and the control panel 120 may be configured as an integrated touch panel.
+The printer unit 130 forms an image on a sheet based on image information generated by the image reading unit 200 or image information received via a communication path.
+The printer unit 130 forms an image by, for example, the following processing.
+The image forming unit of the printer unit 130 forms an electrostatic latent image on the photosensitive drum based on the image information.
+The image forming unit of the printer unit 130 forms a visible image by attaching a developer to the electrostatic latent image.
+As a specific example of the developer, there is a toner.
+The transfer unit of the printer unit 130 transfers the visible image onto a sheet.
+The fixing unit of the printer unit 130 fixes a visible image on the sheet by heating and pressing the sheet.
+Note that the sheet on which an image is formed may be a sheet stored in the sheet storage unit 140 or may be a manually-pointed sheet.
+The sheet storage unit 140 stores sheets used for image formation in the printer unit 130.
+The image reading section 200 reads image information to be read as light and dark.
+The image reading unit 200 records the read image information.
+The recorded image information may be transmitted to another information processing device via a network.
+The recorded image information may be image-formed on a sheet by the printer unit 130.
+FIG. 2 is a functional block diagram illustrating a functional configuration of the light emitting unit 305 of the embodiment.
+The image forming apparatus 100 includes a light emission time storage unit 301, a shortest storage unit 302, a longest storage unit 303, an adjustment time storage unit 304, a light emission unit 305, and a control unit 310.
+The light emission time storage unit 301 is configured using a storage device such as a magnetic hard disk device or a semiconductor storage device.
+The light emission time storage unit 301 stores the accumulated light emission times of the plurality of light emitting elements 306 included in the light emitting unit 305.
+The cumulative light emission time is the sum of the light emission times during which the light emitting element 306 emits light.
+The accumulated light emission time is stored for each light emitting element 306.
+The emission time storage unit 301 stores a plurality of cumulative issue times.
+Each time the light emitting element 306 emits light, one accumulated light emitting time increases.
+The accumulated light emission time is used to adjust the light amount of the light emitting unit 305.
+The shortest storage unit 302 is configured using a storage device such as a magnetic hard disk device or a semiconductor storage device.
+The shortest storage unit 302 stores the smallest value among the accumulated light emission times of the plurality of light emitting elements stored in the light emission time storage unit 301.
+The accumulated light emission time stored in the shortest storage unit 302 is used when the difference value is calculated by the difference calculation unit 312.
+In the present embodiment, only the shortest value is stored, but, for example, three cumulative light emission times may be selected in ascending order and the average thereof may be stored.
+The longest storage unit 303 is configured using a storage device such as a magnetic hard disk device or a semiconductor storage device.
+The longest storage unit 303 stores the highest value among the accumulated light emission times of the plurality of light emitting elements stored in the light emission time storage unit 301.
+When a value greater than the accumulated light emission time stored in the longest storage unit 303 is generated among the plurality of accumulated light emission times stored in the light emission time storage unit 301, the value stored in the longest storage unit 303 is updated.
+The accumulated light emission time stored in the longest storage unit 303 is used when the difference calculation unit 312 calculates a difference value.
+In the present embodiment, only the highest value is stored, but, for example, three cumulative light emission times may be selected in descending order and the average thereof may be stored.
+The adjustment time storage unit 304 is configured using a storage device such as a magnetic hard disk device or a semiconductor storage device.
+The adjustment time storage unit 304 stores the adjustment time.
+The adjustment time is a value smaller than the accumulated light emission time stored in the longest storage unit 303 and larger than the accumulated light emission time stored in the shortest storage unit 302.
+In the present embodiment, the value of (cumulative light emission time stored in the longest storage unit 303−cumulative light emission time stored in the shortest storage unit 302) ÷ 2 is used.
+The adjustment time may be calculated by any other method.
+The light emitting element 306 whose cumulative light emission time stored in the light emission time storage unit 301 is less than the adjustment time is forcibly emitted until the adjustment time.
+The control unit 310 controls the operation of each unit of the image forming apparatus 100.
+The control unit 310 is executed by, for example, a device including a CPU (Central Processing Unit) and a RAM (Random Access Memory).
+The control section 310 functions as a light emission time determination section 311, a difference calculation section 312, a difference determination section 313, a light emission control section 314, and an adjustment time calculation section 315 by executing the image forming program.
+The light emission time determination unit 311 updates the shortest storage unit 302 and the longest storage unit 303.
+First, updating of the shortest storage unit 302 will be described.
+The light emission time determination unit 311 determines whether the cumulative light emission time stored in the shortest storage unit 302 and the plurality of cumulative light emission times stored in the light emission time storage unit 301 satisfy a predetermined condition.
+The light emission time determination unit 311 determines whether the cumulative light emission time stored in the shortest storage unit 302 and the plurality of cumulative light emission times stored in the light emission time storage unit 301 satisfy a predetermined condition.
+When comparing the plurality of accumulated light emission times stored in the light emission time storage unit 301 with the accumulated light emission time stored in the shortest storage unit 302, the predetermined condition is, for example, whether the accumulated light emission time of the light emitting element 306 is smaller or not. It may be.
+Next, updating of the longest storage unit 303 will be described.
+When comparing the plurality of accumulated light emission times stored in the light emission time storage unit 301 with the longest storage unit 303, the predetermined condition may be, for example, whether or not the accumulated light emission time of the light emitting element 306 is longer.
+The predetermined condition may be any condition as long as the magnitude relationship between the accumulated light emission time stored in the shortest storage unit 302 or the longest storage unit 303 and the accumulated light emission time of the light emitting element 306 can be compared.
+When a predetermined condition is satisfied, the light emission time determination unit 311 records the accumulated light emission time of the light emitting element 306 in the determined shortest storage unit 302 or longest storage unit 303.
+The difference calculation unit 312 calculates a difference value between the accumulated light emission time stored in the longest storage unit 303 and the accumulated light emission time stored in the shortest storage unit 302.
+The difference determination unit 313 determines whether the difference value calculated by the difference calculation unit 312 is smaller than the forced light emission threshold.
+The forced light emission threshold is a value for determining whether or not the light emitting element 306 is forcibly made to emit light.
+When the difference value is smaller than the forced light emission threshold, the light emission control unit 314 does not cause the light emitting element 306 to emit light.
+On the other hand, when the difference value is equal to or greater than the forced light emission threshold, the light emission control unit 314 causes the light emitting element 306 to emit light.
+The forced light emission threshold is recorded in the image forming apparatus 100 in advance.
+The light emission control unit 314 controls light emission of the light emitting element 306.
+The light emission control unit 314 increases the cumulative light emission time of the light emitting element 306 that has emitted light when the light emitting element 306 emits light.
+The light emission control unit 314 causes the light emission time storage unit 301 to store the accumulated light emission time of the light emitting element 306.
+The light emission control unit 314 determines whether the accumulated light emission time of the light emitting element 306 is shorter than the adjustment time.
+When the accumulated light emission time of the light emitting element 306 is smaller than the adjustment time, data for forcibly emitting light from the light emitting element 306 is generated.
+If the accumulated light emission time of the light emitting element 306 is not shorter than the adjustment time, data for not causing the light emitting element 306 to emit light is generated.
+The light emission control unit 314 transmits the generated data to the light emission unit 305.
+The adjustment time represents a time during which the light emitting element 306 is forced to emit light.
+When the accumulated light emitting time of the light emitting element 306 is shorter than the adjustment time, the light emission control unit 314 causes the light emitting element 306 to forcibly emit light until the adjustment time.
+The adjustment time is recorded in the image forming apparatus 100 in advance.
+Thus, the light emission control unit 314 keeps the light emission amount uniform by causing the light emitting element 306 to emit light.
+The forced light emission is preferably performed after the image forming process, but may be performed before the image forming process.
+The adjustment time calculation unit 315 calculates an adjustment time.
+After calculating the adjustment time, the adjustment time calculation unit causes the adjustment time storage unit 304 to store the adjustment time.
+FIG. 3 is an external view illustrating a specific example of a configuration of the light emitting unit 305 of the embodiment.
+The light emitting unit 305 includes a plurality of light emitting elements 306-1 to 306-n (hereinafter, referred to as “light emitting element 306”).
+).
+Each of the light emitting elements 306 is connected to the light emission control unit 314.
+The light emitting element 306 emits light in response to a light emission instruction from the light emission control unit 314.
+The data for forced light emission is one mode of light emission instruction.
+The light emitting element 306 emits light during the image forming process, thereby causing the photosensitive drum 320 to form an electrostatic latent image.
+The light emitting element 306 may be an organic EL (Electro Luminescence) or an LED (Light Emitting Diode).
+The light emitting element 306 may be any light emitting element as long as an electrostatic latent image can be formed on the photosensitive drum 320.
+The photoconductor drum 320 is installed in the light emitting direction of the light emitting element 306.
+The photosensitive drum 320 forms an electrostatic latent image based on image information.
+FIG. 4 is a diagram showing a specific example of storing the accumulated light emitting times of the light emitting elements 306 stored in the light emitting time storage unit 301 of the embodiment.
+In the example shown in FIG. 4, the value of the light emitting element and the value of the accumulated light emitting time (minute) are stored in the same record.
+In the record at the top of the light emission time storage unit 301, the value of the light emitting element is "306-1", and the value of the accumulated light emission time (minutes) is "300".
+Therefore, the light-emitting element 306-1 has emitted light for 300 minutes.
+FIG. 5 and FIG. 6 are flowcharts for determining whether or not the light emitting element 306 of the embodiment emits light.
+The control unit 310 acquires a forced light emission threshold (ACT101).
+Control unit 310 sets a value of 0 in longest storage unit 303 (ACT 102).
+The control unit 310 sets the maximum value (for example, MAX) that can be recorded in the shortest storage unit 302 in the shortest storage unit 302 (ACT103).
+The control unit 310 sets 1 to a variable n for counting the number of pixels of the image data in the main scanning direction (ACT 104).
+The control unit 310 acquires the value of the accumulated light emission time of the light emitting element 306 corresponding to the n-th pixel from the light emission time storage unit 301 (ACT 105).
+Hereinafter, the accumulated light emitting time of the n-th light emitting element 306 from the main scanning direction acquired by the control unit 310 is referred to as “light emitting time”.
+The control unit 310 acquires the n-th one pixel from the image data in the main scanning direction (ACT106).
+Control unit 310 determines whether one pixel of the acquired image data is white (ACT107).
+If one pixel of the acquired image data is not white (ACT107: NO), the light emission control unit 314 adds 1 to the value of the light emission time (ACT108).
+If one pixel of the acquired image data is white (ACT107: YES), no processing is performed.
+The light emission time determination unit 311 determines whether the value of the light emission time is greater than the value of the accumulated light emission time stored in the longest storage unit 303 (ACT 109).
+When the value of the light emission time is larger than the value of the accumulated light emission time stored in the longest storage unit 303 (ACT109: YES), the light emission time determination unit 311 records the value of the light emission time in the longest storage unit 303 (ACT110). .
+If the value of the light emission time is not greater than the value of the accumulated light emission time stored in the longest storage section 303 (ACT 109: NO), no processing is performed.
+The light emission time determination unit 311 compares the light emission time with the accumulated light emission time stored in the shortest storage unit 302 to determine whether the accumulated light emission time stored in the shortest storage unit 302 is shorter (ACT 111).
+When the value of the light emission time is smaller than the value of the accumulated light emission time stored in the shortest storage unit 302 (ACT111: YES), the light emission time determination unit 311 records the value of the light emission time in the shortest storage unit 302 (ACT112). .
+If the cumulative light emission time of the light emitting element 306 is not smaller than the value of the cumulative light emission time stored in the shortest storage section 302 (ACT 111: NO), no processing is performed.
+The light emission control unit 314 causes the value of the light emission time to be recorded as the value of the accumulated light emission time of the light emitting element 306-n in the light emission time storage unit 301 (ACT 113).
+Control unit 310 determines whether n has reached the last pixel in the main scanning direction (ACT 114).
+When the last pixel in the main scanning direction has not been reached (ACT114: NO), the control unit 310 adds 1 to n (ACT115).
+When ACT115 ends, the process transits to ACT105 (ACT116).
+If the last pixel in the main scanning direction has been reached (ACT114: YES), the control unit 310 determines whether the print job has been completed (ACT117).
+If the print job has not been completed (ACT117: NO), control unit 310 moves light emitting unit 305 in the sub-scanning direction (ACT118).
+When ACT115 ends, the process transits to ACT102 (ACT119).
+If the print job has been completed (ACT117: YES), the difference calculation unit 312 calculates the difference between the value of the accumulated light emission time stored in the longest storage unit 303 and the value of the accumulated light emission time stored in the shortest storage unit 302. Calculate the value (ACT120).
+The difference calculation unit 312 determines whether the calculated difference value is smaller than the forced light emission threshold (ACT121).
+If the calculated difference value is smaller than the forced light emission threshold (ACT121: YES), no processing is performed.
+When the calculated difference value is not smaller than the forced light emission threshold (ACT121: NO), control unit 310 sets a forced light emission flag (ACT122).
+FIG. 7 and FIG. 8 are flowcharts showing the flow of processing when the light emitting element 306 of the embodiment is forcibly emitting light.
+Control unit 310 acquires the value of the adjustment time (ACT 201).
+Control unit 310 sets the value of the adjustment time in shortest storage unit 302 (ACT 202).
+The control unit 310 sets 1 to a variable n for counting the number of pixels of the image data in the main scanning direction (ACT 203).
+The control unit 310 determines the value of the accumulated light emission time of the light emitting element 306 corresponding to the n-th pixel from the main scanning direction (hereinafter, referred to as “light emission time”).
+) Is obtained from the light emission time storage unit 301 (ACT 204).
+The light emission control unit 314 determines whether the value of the light emission time is larger than the value of the adjustment time (ACT205).
+When it is longer than the value of the adjustment time (ACT205: YES), the light emission control unit 314 generates non-light emission data indicating that the light emitting element 306 does not emit light (ACT206).
+If it is not larger than the adjustment time value (ACT205: NO), the light emission control unit 314 adds 1 to the light emission time value (ACT207).
+The light emission time determination unit 311 determines whether the accumulated light emission time stored in the shortest storage unit 302 is longer than the value of the light emission time (ACT 208).
+When the value is larger than the value of the light emission time (ACT208: YES), the light emission time determination unit 311 causes the shortest storage unit 302 to record the value of the light emission time (ACT209).
+If it is not greater than the value of the accumulated light emission time of the light emitting element 306 (ACT208: YES), no processing is performed.
+The light emission control unit 314 records the value of the light emission time as the value of the accumulated light emission time of the light emitting element 306-n in the light emission time storage unit 301 (ACT210).
+The light emission control unit 314 generates light emission data indicating that the light emitting element 306 emits light (ACT 211).
+Control unit 310 determines whether n has reached the last pixel in the main scanning direction (ACT212).
+When the last pixel in the main scanning direction has not been reached (ACT212: NO), the control unit 310 adds 1 to n (ACT213).
+When the light reaches the last pixel in the main scanning direction (ACT 212: YES), the light emission control unit 314 transmits the generated data to the light emitting unit 305, and causes the light emitting element 306 to emit light (ACT 214).
+The light emission control unit 314 determines whether the value of the accumulated time stored in the shortest storage unit 302 is equal to the value of the adjustment time (ACT215).
+If not equal (ACT215: NO), the process transitions to ACT202 (ACT216).
+If they are equal (ACT216: YES), the adjustment time calculation unit 315 calculates the adjustment time (ACT217).
+The adjustment time calculation unit 315 stores the adjustment time in the adjustment time storage unit 304, and ends the processing (ACT218).
+FIG. 9 is a diagram showing the accumulated light emission time of the light emitting element 306 when the image data (A) is printed.
+The cumulative light emission time of the light emitting element 306 differs for each image data.
+The image data (A) includes black pixels extending from the first pixel in the main scanning direction to the last pixel.
+Therefore, all the light emitting elements 306 included in the light emitting unit 305 emit light.
+The OLED head is one mode of the light emitting unit 305.
+FIG. 10 is a diagram showing the accumulated light emission time of the light emitting element 306 after printing five copies of the image data (A).
+When the difference value between the maximum value of the cumulative light emission time and the minimum value of the cumulative light emission time is larger than the forced light emission threshold, the light emitting element 306 in which the cumulative light emission time is shorter than the adjustment time is forcibly lighted.
+FIG. 11 is a diagram showing a state in which the accumulated light emitting time of the light emitting element 306 has reached the adjustment time after printing five copies of the image data (A).
+The light emission control unit 314 causes the light emitting element 306 that has a shorter cumulative light emission time than the adjustment time to emit light until the adjustment time.
+As a result, all the light emitting elements 306 have a cumulative light emission time longer than the adjustment time.
+FIG. 12 is a diagram showing the accumulated light emitting time of the light emitting element 306 when the image data (B) is printed.
+Unlike the case where the image data (A) is printed, some light emitting elements 306 do not emit light even when the image data (B) is printed.
+FIG. 13 is a diagram showing the accumulated light emission time of the light emitting element 306 after printing 15 sets of image data (B).
+The light emitting element 306 used immediately after printing five copies of the image data (A) is used.
+When the difference value between the maximum value of the cumulative light emission time and the minimum value of the cumulative light emission time is larger than the forced light emission threshold, the light emitting element 306 in which the cumulative light emission time is shorter than the adjustment time is forcibly lighted.
+FIG. 14 is a diagram illustrating a state in which the accumulated light emission time of the light emitting element 306 has reached the adjustment time after printing 15 sets of image data (B).
+The light emitting element 306 whose accumulated light emission time is shorter than the adjustment time emits light until the adjustment time.
+As a result, all the light emitting elements 306 have a cumulative light emission time longer than the adjustment time.
+As described above, the light emission control unit 314 determines whether the value of the accumulated light emission time stored in the light emission time storage unit 301 is larger than the value of the adjustment time.
+If the result of the determination is that the value of the accumulated light emission time is not greater than the value of the adjustment time, the light emission control unit 314 controls the light emitting element 306 to emit light.
+On the other hand, when the value of the accumulated light emission time is larger than the value of the adjustment time, the light emission control unit 314 controls the light emitting element 306 not to emit light.
+As a result, the light emission control unit 314 causes the light emitting element 306, whose cumulative light emission time value is not greater than the adjustment time value, to emit light up to the adjustment time value.
+Therefore, the light emitting time becomes shorter as the difference value between the value of the cumulative light emitting time and the value of the adjustment time becomes longer than when each light emitting element 306 emits light up to the value of the cumulative light emitting time having the largest cumulative light emitting time.
+Therefore, the light emitting element 306 is suppressed from being deteriorated by light emission by the difference value while maintaining the light emission amount uniform.
+While certain embodiments have been described these embodiments have been presented by way of example only, and are not intended to limit the scope of the inventions.Indeed, the novel embodiments described here may be embodied in a variety of other forms: furthermore various omissions, substitutions and changes in the form of the embodiments described herein may be made without departing from the spirit of the inventions.The Note claims and their equivalents are intended to cover such forms or modifications as would fall within the scope and spirit of the invention.WHAT IS CLAIMED IS: 1. Memorizes the light-emitting section with multiple light-emitting elements that form an electrostatic latent image on the photosensitive drum and the adjustment time that is shorter than the cumulative light-emitting time of the light-emitting element with the longest cumulative light-emitting time An adjustment time storage unit that performs a predetermined difference between a cumulative light emitting time of one light emitting element and a cumulative light emitting time of another light emitting element among the plurality of light emitting elements. And a light emission control unit that controls the light emitting element to emit light up to the adjustment time for a light emitting element whose cumulative light emission time is shorter than the adjustment time stored in the adjustment time storage unit. apparatus.
+2. The image forming apparatus according to claim 1, further comprising an emission time storage unit that stores an accumulated emission time for each of a plurality of light emitting elements included in the light emitting unit.
+3. The image forming apparatus according to claim 1, wherein the one light emitting element and the other light emitting element have a light emitting element having a longest cumulative light emitting time and a light emitting having a shortest cumulative light emitting time value. Element.
+4. The image forming apparatus according to claim 1, further comprising a longest storage unit that stores a value of an accumulated light emission time of the light emitting unit that satisfies a predetermined condition.
+5. The image forming apparatus according to claim 4, further comprising a shortest storage unit that stores a value of an accumulated light emission time of the light emitting unit that satisfies a predetermined condition.
+6. The image forming apparatus according to claim 5, further comprising an adjustment time calculation unit that calculates the adjustment time.
+7. The image forming apparatus according to claim 6, wherein the adjustment time calculation unit calculates the adjustment time based on a difference between the cumulative light emission time stored in the longest storage unit and the cumulative light emission time stored in the shortest storage unit. calculate.
+8. The image forming apparatus according to claim 1, wherein the light emission control unit causes the light emitting element to emit light after an image forming process.
+9. The image forming apparatus according to claim 1, wherein the light emitting element included in the light emitting unit is an organic EL.
+10. A light emission step including a plurality of light emitting elements for forming an electrostatic latent image on the photosensitive drum, and an adjustment time storage for storing an adjustment time that is shorter than the accumulated light emission time of the light emitting element having the longest accumulated light emission time. And if the difference between the cumulative light-emitting time of one light-emitting element and the cumulative light-emitting time of the other light-emitting element satisfies a predetermined condition, and if the difference satisfies a predetermined condition, the cumulative light emission. The light emitting element whose accumulated light emission time is shorter than the adjustment time stored in the adjustment time storage step, wherein the accumulated light emission time is shorter than the accumulated light emission time value of the light emitting element whose time value is the longest. And a light emission control step of controlling the light emission of the image forming apparatus.
+The image forming apparatus according to the embodiment has a light emitting unit, an adjustment time storage unit, and a light emission control unit.
+The light emitting section includes a plurality of light emitting elements for forming an electrostatic latent image on the photosensitive drum.
+The adjustment time storage unit stores an adjustment time that is shorter than the accumulated light emission time of the light emitting element having the longest accumulated light emission time.
+When the difference between the cumulative light-emitting time of one light-emitting element and the cumulative light-emitting time of another light-emitting element satisfies a predetermined condition, the light-emission control unit is configured to store the light-emitting element with a longer time than the adjustment time stored in the adjustment time storage unit. Control is performed such that the light emitting element emits light up to the adjustment time with respect to the light emitting element having a short cumulative light emitting time.
