@@ -19,20 +19,22 @@ punkt._params.abbrev_types.update(['al', 'etc', 'approx', 'cf', 'p.a', 'no', 'ma
 def preprocess(full_text, lang):
     text = ''
     if lang == 'ja':
-        #Remove text that is unique to the Japanese document
+        # Remove text that is unique to the Japanese document
+        # Regex pattern: remove spaces of > 1 length, remove bracketed headings
         text = re.sub(
-            r' {2,}|^\s*【\d+】|^【特許文献\d+】|^【書類名】明細書$', '', full_text, flags=re.MULTILINE)
+            r' {2,}|^\s*【\d+】|^【特許文献\d+】|^【書類名】明細書$|^【請求項\d+】$', '', full_text, flags=re.MULTILINE)
         words_to_delete = ['整理番号', '(Proof)', '提出日']
         lines = text.split('\n')
         lines = [line for line in lines if not any(word in line for word in words_to_delete)]
         text = '\n'.join(lines)
+        # Remove lenticular brackets and ideographic spaces
         text = re.sub(r'[【】]|^\s*\n$|\u3000', '', text)
     elif lang == 'en':
-        #Remove text that is unique to the English document
+        # Remove text that is unique to the English document
         text = re.sub(
-            r' {2,} |This application is based upon(.*)herein by reference.|CROSS-REFERENCE(.*)APPLICATION|\[\d+\]', '',
+            r' {2,} |This application is based upon(.*)herein by reference.|CROSS-REFERENCE(.*)APPLICATION|\[\d+\]|\s*\d+\.\s+', '',
             full_text, flags=re.MULTILINE | re.IGNORECASE)
-        #Fix Fig. 1 being separatedz by removing the space
+        # Fix Fig. 1 being separatedz by removing the space
         text = re.sub(r'FIG.\s+', 'FIG.', text, flags=re.IGNORECASE)
         text = re.sub(r'FIGS.\s+', 'FIGS.', text, flags=re.IGNORECASE)
     return text

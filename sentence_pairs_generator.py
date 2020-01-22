@@ -89,7 +89,7 @@ def fix_ja_english_words(ja_list, en_list):
                         if j:
                             match_string += '\s*' + char
                         else:
-                            match_string += char
+                            match_string += '\b' + char
                     # Try to find matching word in the English sentence
                     result = re.search(match_string, en_list[i], flags=re.IGNORECASE)
                     replacement_word = result.group(0) if result else None
