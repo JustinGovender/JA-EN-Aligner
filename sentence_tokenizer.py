@@ -5,9 +5,6 @@ import spacy
 
 # from core.utils.constant import CHINESE_OR_JAPANESE
 
-#Try spacy
-nlp = spacy.load('en_core_web_sm')
-doc = ''
 
 
 jp_zh_sent_tokenizer = RegexpTokenizer('[^！？?!。]*[！？!?。]')
@@ -57,9 +54,6 @@ def replace_bracketed_punctuation(text):
             # Replace it in the actual list
             text = text.replace(match, replacement)
     return text
-
-
-
 
 
 def tokenize(tokenize_fn, full_text):
