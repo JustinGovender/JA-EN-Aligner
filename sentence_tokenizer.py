@@ -17,16 +17,17 @@ def preprocess(full_text, lang):
     text = ''
     if lang == 'ja':
         # Remove text that is unique to the Japanese document
-        # Regex pattern: remove spaces of > 1 length, remove bracketed headings, Re
+        # Regex pattern: remove spaces of > 1 length, remove ID numbers , remove everything before the title,remove bracketed headings
         text = re.sub(
-            r' {2,}|^\s*【\d+】|^【特許文献\d+】|^【書類名】明細書$|^【請求項\d+】$|^整理番号(.*)\d+$|整理番号([\s\S]*)\d+\/[A-Z]', '', full_text, flags=re.MULTILINE)
+            r' {2,}|^\w*\d+\s*$|^\s*【\d+】|^【特許文献\d+】|^【書類名】明細書$|^【請求項\d+】$|^整理番号(.*)\d+$|整理番号([\s\S]*)\d+\/[A-Z]', '', full_text, flags=re.MULTILINE)
         # Remove lenticular brackets and ideographic spaces
         text = re.sub(r'\b\u3000\b', ' ', text)
         text = re.sub(r'[【】]|^\s*\n$|\u3000', '', text)
+        text = re.sub(r'^[\s\S]*明\s*細\s*書', '', text) # <------------------------ THIS IS NOT WORKING :(((((
     elif lang == 'en':
         # Remove text that is unique to the English document
         text = re.sub(
-            r' {2,} |This application is based upon(.*)herein by reference.|CROSS-REFERENCE(.*)APPLICATION|\[\d+\]|\s*\d+\.\s+', '',
+            r' {2,} |^\w*\d+\s*$|This application is based upon(.*)herein by reference.|CROSS-REFERENCE(.*)APPLICATION|\[\d+\]|\s*\d+\.\s+', '',
             full_text, flags=re.MULTILINE | re.IGNORECASE)
         # Fix Fig. 1 being separatedz by removing the space
         text = re.sub(r'FIG.\s+', 'FIG.', text, flags=re.IGNORECASE)

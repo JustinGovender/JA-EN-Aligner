@@ -167,10 +167,10 @@ def parse_args(argv):
         '--target_lang', '-tgt_lang', default='en',
         help='target language')
     parser.add_argument(
-        '--source_file', '-src_file', default=os.path.join('.', '김태동 고문님 번역 파일들', '2017', 'KE17-00222.docx'),
+        '--source_file', '-src_file', default=os.path.join('.', '김태동 고문님 번역 파일들', '2015', 'KE15-02730.pdf'),
         help='source file')
     parser.add_argument(
-        '--target_file', '-tgt_file', default=os.path.join('.', '김태동 고문님 번역 파일들', '2017', 'ke17-00222_EN.docx'),
+        '--target_file', '-tgt_file', default=os.path.join('.', '김태동 고문님 번역 파일들', '2015', 'ke15-02730-EN.docx'),
         help='target file')
     parser.add_argument(
         '--source_to_target_file', '-srctotgt_file', default=os.path.join('test_data', 'misc_test', 'ref.txt'),
