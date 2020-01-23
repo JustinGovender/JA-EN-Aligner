@@ -20,13 +20,9 @@ def preprocess(full_text, lang):
     text = ''
     if lang == 'ja':
         # Remove text that is unique to the Japanese document
-        # Regex pattern: remove spaces of > 1 length, remove bracketed headings
+        # Regex pattern: remove spaces of > 1 length, remove bracketed headings, Re
         text = re.sub(
-            r' {2,}|^\s*【\d+】|^【特許文献\d+】|^【書類名】明細書$|^【請求項\d+】$', '', full_text, flags=re.MULTILINE)
-        words_to_delete = ['整理番号', '(Proof)', '提出日']
-        lines = text.split('\n')
-        lines = [line for line in lines if not any(word in line for word in words_to_delete)]
-        text = '\n'.join(lines)
+            r' {2,}|^\s*【\d+】|^【特許文献\d+】|^【書類名】明細書$|^【請求項\d+】$|^整理番号(.*)\d+$|整理番号([\s\S]*)\d+\/[A-Z]', '', full_text, flags=re.MULTILINE)
         # Remove lenticular brackets and ideographic spaces
         text = re.sub(r'\b\u3000\b', ' ', text)
         text = re.sub(r'[【】]|^\s*\n$|\u3000', '', text)
@@ -38,19 +34,47 @@ def preprocess(full_text, lang):
         # Fix Fig. 1 being separatedz by removing the space
         text = re.sub(r'FIG.\s+', 'FIG.', text, flags=re.IGNORECASE)
         text = re.sub(r'FIGS.\s+', 'FIGS.', text, flags=re.IGNORECASE)
+    text = replace_bracketed_punctuation(text)
     return text
+
+
+# Replaces all punctuation inside brackets so it doesn't get incorrectly tokenized
+def replace_bracketed_punctuation(text):
+
+    # Search line for brackets
+    match_list = []
+    match_matrix = re.findall(r'\((.*?)\)|（(.*?)）|「(.*?)」', text)
+    for i in match_matrix:
+        for j in i:
+            if j is not '':
+                match_list.append(j)
+    for match in match_list:
+        if re.search(r'[。\!\?]', match):
+            # Construct replacement string
+            replacement = match.replace('。', '<gcon_ja_period>')
+            replacement = replacement.replace('!', '<gcon_exclamation_mark>')
+            replacement = replacement.replace('?', '<gcon_question_mark>')
+            # Replace it in the actual list
+            text = text.replace(match, replacement)
+    return text
+
+
+
 
 
 def tokenize(tokenize_fn, full_text):
     text_infos = []
     sents = []
-    extra_tokenizer = RegexpTokenizer('[^【】]*')
     full_text = full_text.replace('\n', '')
-    for subsentence in tokenize_fn(full_text):
-        #for subsentence in extra_tokenizer.tokenize(sentence): #Regex second pass
-        if subsentence.strip():  # Checks that it is not just whitespace/ doesn't actually do anything
-            sents.append(subsentence)
-            text_infos.append({'text': subsentence.strip()})
+    for sentence in tokenize_fn(full_text):
+        if sentence.strip():  # Checks that it is not just whitespace/ doesn't actually do anything?
+            sents.append(sentence)
+            # Replace special characters with original text
+            if '<gcon_' in sentence:
+                sentence = sentence.replace('<gcon_ja_period>', '。')
+                sentence = sentence.replace('<gcon_exclamation_mark>', '!')
+                sentence = sentence.replace('<gcon_question_mark>', '?')
+            text_infos.append({'text': sentence.strip()})
 
 
         # sents = [sent.strip() for sent in tokenize_fn(full_text) if sent.strip()]

@@ -109,7 +109,6 @@ The adjustment time calculation unit 315 calculates an adjustment time.
 After calculating the adjustment time, the adjustment time calculation unit causes the adjustment time storage unit 304 to store the adjustment time.
 FIG. 3 is an external view illustrating a specific example of a configuration of the light emitting unit 305 of the embodiment.
 The light emitting unit 305 includes a plurality of light emitting elements 306-1 to 306-n (hereinafter, referred to as “light emitting element 306”).
-).
 Each of the light emitting elements 306 is connected to the light emission control unit 314.
 The light emitting element 306 emits light in response to a light emission instruction from the light emission control unit 314.
 The data for forced light emission is one mode of light emission instruction.
@@ -154,8 +153,7 @@ FIG. 7 and FIG. 8 are flowcharts showing the flow of processing when the light e
 Control unit 310 acquires the value of the adjustment time (ACT 201).
 Control unit 310 sets the value of the adjustment time in shortest storage unit 302 (ACT 202).
 The control unit 310 sets 1 to a variable n for counting the number of pixels of the image data in the main scanning direction (ACT 203).
-The control unit 310 determines the value of the accumulated light emission time of the light emitting element 306 corresponding to the n-th pixel from the main scanning direction (hereinafter, referred to as “light emission time”).
-) Is obtained from the light emission time storage unit 301 (ACT 204).
+The control unit 310 acquires the value of the accumulated light emission time of the light emitting element 306 corresponding to the n-th pixel from the main scanning direction (hereinafter, referred to as “light emission time”) from the light emission time storage unit 301 (ACT 204).
 The light emission control unit 314 determines whether the value of the light emission time is larger than the value of the adjustment time (ACT205).
 When it is longer than the value of the adjustment time (ACT205: YES), the light emission control unit 314 generates non-light emission data indicating that the light emitting element 306 does not emit light (ACT206).
 If it is not larger than the adjustment time value (ACT205: NO), the light emission control unit 314 adds 1 to the light emission time value (ACT207).

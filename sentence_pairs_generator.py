@@ -133,6 +133,7 @@ def generate_pairs(source_lang, target_lang, source_file, target_file, srctotarg
     refiner = Refiner(os.path.join('.', 'regex.txt'))
     source_list = refiner.convert_text(source_list)
     target_list = refiner.convert_text(target_list)
+    test_text = ' '.join(target_list)
 
     if srctotarget_file:
         with open(srctotarget_file, 'r') as srctotarget:
@@ -150,6 +151,7 @@ def generate_pairs(source_lang, target_lang, source_file, target_file, srctotarg
     sources, targets = align_sentences(source_list, target_list, refs)
     if source_lang is 'ja':
         fix_ja_english_words(sources, targets)
+    test_text = ' '.join(targets)
     return sources, targets
 
 
