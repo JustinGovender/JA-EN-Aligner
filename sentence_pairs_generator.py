@@ -10,7 +10,7 @@ from google_api import google_translate
 from Bleualign.align import Aligner
 from pdf_parser import PdfParser
 import re
-from refine import Refiner
+
 
 GOOGLE_SPLIT_SIZE = 100
 
@@ -25,8 +25,8 @@ def make_full_text(dict_list):
 
 def make_sentences(text, lang):
     source_text = []
-    full_text = ' '.join([value['text'] for value in text if value['text']])
-    for sent in sentence_tokenize(full_text, lang):
+    # text = [value['text'] for value in text if value['text']]
+    for sent in sentence_tokenize(text, lang):
         source_text.append(sent)
     return source_text
 
@@ -114,25 +114,24 @@ def generate_pairs(source_lang, target_lang, source_file, target_file, srctotarg
     # process file format into dictionary
     if os.path.splitext(source_file)[1].lower() == '.pdf':
         parser = PdfParser()
-        source_dict_list, _ = parser.pdf_parse(source_file, False, source_lang)
+        source_list = parser.get_text_from_pdf(source_file, False).split('\n')
+        source_list = make_sentences(source_list, source_lang)
     else:
         # Default is docx
         source_dict_list = process(source_file)
-        source_dict_list = make_sentences(source_dict_list, source_lang)
-    source_list = dict_to_list(source_dict_list, 'text')
+        source_list = dict_to_list(source_dict_list, 'text')
+        source_list = make_sentences(source_list, source_lang)
     if os.path.splitext(target_file)[1].lower() == '.pdf':
         parser = PdfParser()
-        target_dict_list, _ = parser.pdf_parse(target_file, False, target_lang, True)
+        target_list = parser.get_text_from_pdf(target_file, False).split('\n')
+        target_list = make_sentences(target_list, target_lang)
     else:
         # Default is docx
         target_dict_list = process(target_file)
-        target_dict_list = make_sentences(target_dict_list, target_lang)
-    target_list = dict_to_list(target_dict_list, 'text')
+        target_list = dict_to_list(target_dict_list, 'text')
+        target_list = make_sentences(target_list, target_lang)
 
-    #Make sure all characters are half-width
-    refiner = Refiner(os.path.join('.', 'regex.txt'))
-    source_list = refiner.convert_text(source_list)
-    target_list = refiner.convert_text(target_list)
+
     test_text = ' '.join(target_list) # <--------------------------------------------------------------- Debug !Remove!
 
     if srctotarget_file:
@@ -151,7 +150,7 @@ def generate_pairs(source_lang, target_lang, source_file, target_file, srctotarg
     sources, targets = align_sentences(source_list, target_list, refs)
     if source_lang is 'ja':
         fix_ja_english_words(sources, targets)
-    test_text = ' '.join(targets) # <--------------------------------------------------------------- Debug !Remove!
+    test_text2 = ' '.join(targets) # <--------------------------------------------------------------- Debug !Remove!
     return sources, targets
 
 
@@ -167,10 +166,10 @@ def parse_args(argv):
         '--target_lang', '-tgt_lang', default='en',
         help='target language')
     parser.add_argument(
-        '--source_file', '-src_file', default=os.path.join('.', '김태동 고문님 번역 파일들', '2015', 'KE15-02730.pdf'),
+        '--source_file', '-src_file', default=os.path.join('.', '김태동 고문님 번역 파일들', '2015', 'KE15-00267.pdf'),
         help='source file')
     parser.add_argument(
-        '--target_file', '-tgt_file', default=os.path.join('.', '김태동 고문님 번역 파일들', '2015', 'ke15-02730-EN.docx'),
+        '--target_file', '-tgt_file', default=os.path.join('.', '김태동 고문님 번역 파일들', '2015', 'ke15-00267-EN.docx'),
         help='target file')
     parser.add_argument(
         '--source_to_target_file', '-srctotgt_file', default=os.path.join('test_data', 'misc_test', 'ref.txt'),

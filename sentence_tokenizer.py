@@ -1,7 +1,8 @@
+import os
 import nltk
 import re
 from nltk.tokenize import RegexpTokenizer
-import spacy
+from refine import Refiner
 
 # from core.utils.constant import CHINESE_OR_JAPANESE
 
@@ -14,26 +15,34 @@ punkt._params.abbrev_types.update(['al', 'etc', 'approx', 'cf', 'p.a', 'no', 'ma
 
 
 def preprocess(full_text, lang):
-    text = ''
+    _text = ''
+    # Make sure all characters are half-width
+    refiner = Refiner(os.path.join('.', 'regex.txt'))
+    _text = refiner.convert_text(full_text)
+    _text = '\n'.join(_text)
+
     if lang == 'ja':
         # Remove text that is unique to the Japanese document
         # Regex pattern: remove spaces of > 1 length, remove ID numbers , remove everything before the title,remove bracketed headings
-        text = re.sub(
-            r' {2,}|^\w*\d+\s*$|^\s*【\d+】|^【特許文献\d+】|^【書類名】明細書$|^【請求項\d+】$|^整理番号(.*)\d+$|整理番号([\s\S]*)\d+\/[A-Z]', '', full_text, flags=re.MULTILINE)
+        _text = re.sub(
+            r' {2,}|^\w*\d+\s*$|^\s*【\d+】|^【特許文献\d+】|^【書類名】明細書$|^【請求項\d+】$|整理番号[\s\S]*?\d日\s*\d+/*[A-Z]*|【選択図】[\S\s]*', '', _text, flags=re.MULTILINE)
         # Remove lenticular brackets and ideographic spaces
-        text = re.sub(r'\b\u3000\b', ' ', text)
-        text = re.sub(r'[【】]|^\s*\n$|\u3000', '', text)
-        text = re.sub(r'^[\S\s]*明\s*細\s*書$', '', text ,flags= re.MULTILINE)
+        _text = re.sub(r'\b\u3000\b', ' ', _text)
+        _text = re.sub(r'[【】]|^\s*\n$|\u3000', '', _text)
+        # Remove everything before the title label
+        _text = re.sub(r'^[\S\s]*明\s*細\s*書$', '', _text ,flags= re.MULTILINE)
     elif lang == 'en':
         # Remove text that is unique to the English document
-        text = re.sub(
-            r' {2,} |^\w*\d+\s*$|This application is based upon(.*)herein by reference.|CROSS-REFERENCE(.*)APPLICATION|\[\d+\]|\s*\d+\.\s+', '',
-            full_text, flags=re.MULTILINE | re.IGNORECASE)
-        # Fix Fig. 1 being separatedz by removing the space
-        text = re.sub(r'FIG.\s+', 'FIG.', text, flags=re.IGNORECASE)
-        text = re.sub(r'FIGS.\s+', 'FIGS.', text, flags=re.IGNORECASE)
-    text = replace_bracketed_punctuation(text)
-    return text
+        _text = re.sub(
+            r' {2,} |^\w*\d+\s*$|This application is based upon(.*)herein by reference.|CROSS-REFERENCE(.*)APPLICATION|\[\d+\]|^\s*\d+\.', '',
+            _text, flags=re.MULTILINE | re.IGNORECASE)
+        # Fix Fig. 1 being separated by removing the space
+        _text = re.sub(r'FIG.\s+', 'FIG.', _text, flags=re.IGNORECASE)
+        _text = re.sub(r'FIGS.\s+', 'FIGS.', _text, flags=re.IGNORECASE)
+        # Fix Titles that have have no spaces after them
+        _text = re.sub(r'([A-Z]{3,}\b)\n', r'\1 ', _text)
+    _text = replace_bracketed_punctuation(_text)
+    return _text
 
 
 # Replaces all punctuation inside brackets so it doesn't get incorrectly tokenized
@@ -69,7 +78,7 @@ def tokenize(tokenize_fn, full_text):
                 sentence = sentence.replace('<gcon_ja_period>', '。')
                 sentence = sentence.replace('<gcon_exclamation_mark>', '!')
                 sentence = sentence.replace('<gcon_question_mark>', '?')
-            text_infos.append({'text': sentence.strip()})
+            text_infos.append(sentence.strip())
 
 
         # sents = [sent.strip() for sent in tokenize_fn(full_text) if sent.strip()]
