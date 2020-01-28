@@ -23,7 +23,7 @@ def preprocess(full_text, lang):
         # Remove lenticular brackets and ideographic spaces
         text = re.sub(r'\b\u3000\b', ' ', text)
         text = re.sub(r'[【】]|^\s*\n$|\u3000', '', text)
-        text = re.sub(r'^[\s\S]*明\s*細\s*書', '', text) # <------------------------ THIS IS NOT WORKING :(((((
+        text = re.sub(r'^[\S\s]*明\s*細\s*書$', '', text ,flags= re.MULTILINE)
     elif lang == 'en':
         # Remove text that is unique to the English document
         text = re.sub(
