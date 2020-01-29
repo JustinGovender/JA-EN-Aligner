@@ -20,3 +20,4 @@ google-auth-oauthlib==0.4.1
 pyspellchecker==0.5.2
 xlrd==1.2.0
 pandas
+pytest==5.3.4
