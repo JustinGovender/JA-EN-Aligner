@@ -8,7 +8,7 @@ def test_1():
     assert True
 
 
-def test_2():
+def test_preprocessing_removes_headers():
     test_text = ''
     full_text = environ.get('env_source_text')
     print(full_text)
