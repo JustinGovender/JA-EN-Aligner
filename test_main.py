@@ -16,6 +16,6 @@ def test_preprocessing_removes_header():
         if full_text[i] != '':
             test_text = full_text[i]
             break
-    assert test_text == '発明の名称取付装置および電子機器'
+    assert full_text == '発明の名称取付装置および電子機器'
 
 
