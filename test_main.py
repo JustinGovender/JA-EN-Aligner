@@ -1,4 +1,5 @@
 import pytest
+from os import environ
 
 
 def test_1():
@@ -6,4 +7,5 @@ def test_1():
 
 
 def test_2():
-    assert True or False
+    value = environ.get('test_var')
+    assert value is 'Hello World!'
