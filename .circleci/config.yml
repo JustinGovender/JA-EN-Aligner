@@ -39,8 +39,8 @@ jobs:
           command: |
             python3 -m venv venv
             . venv/bin/activate
-            print('import nltk')
-            print('nltk.download('punkt')'
+            echo import nltk
+            echo nltk.download('punkt'
 
 
       - save_cache:
