@@ -16,6 +16,7 @@ punkt._params.abbrev_types.update(['al', 'etc', 'approx', 'cf', 'p.a', 'no', 'ma
 
 def preprocess(full_text, lang):
     _text = ''
+    _text = '\n'.join(full_text)
     # Make sure all characters are half-width
     refiner = Refiner(os.path.join('.', 'regex.txt'))
     _text = refiner.convert_text(full_text)
