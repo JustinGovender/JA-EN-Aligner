@@ -34,12 +34,13 @@ jobs:
             . venv/bin/activate
             pip install -r requirements.txt
 
-#      - run:
-#          name: install punkt
-#          command: |
-#            python3 -m venv venv
-#            . venv/bin/activate
-#            nltk.download('punkt')
+      - run:
+          name: install punkt
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            import nltk
+            nltk.download('punkt')
 
       - save_cache:
           paths:
