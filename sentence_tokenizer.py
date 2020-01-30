@@ -27,9 +27,9 @@ def preprocess(full_text, lang):
         #     r' {2,}|^\w*\d+\s*$|^\s*【\d+】|^【特許文献\d+】|^【書類名】明細書$|^【請求項\d+】$|整理番号[\s\S]*?\d日\s*\d+/*[A-Z]*|【選択図】[\S\s]*', '', _text, flags=re.MULTILINE)
         # # Remove lenticular brackets and ideographic spaces
         # _text = re.sub(r'\b\u3000\b', ' ', _text)
-        _text = re.sub(r'[【】]|^\s*\n$|\u3000', '', _text)
-        # Remove everything before the title label
-        _text = re.sub(r'^[\S\s]*明\s*細\s*書$', '', _text ,flags= re.MULTILINE)
+        # _text = re.sub(r'[【】]|^\s*\n$|\u3000', '', _text)
+        # # Remove everything before the title label
+        # _text = re.sub(r'^[\S\s]*明\s*細\s*書$', '', _text ,flags= re.MULTILINE)
     elif lang == 'en':
         # Remove text that is unique to the English document
         _text = re.sub(
