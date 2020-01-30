@@ -12,7 +12,7 @@ def test_preprocessing_removes_header():
     test_text = ''
     full_text = environ.get('env_source_text')
     full_text = preprocess(full_text, 'ja').split('\n')
-    for i in enumerate(full_text):
+    for i in range(len(full_text)):
         if full_text[i] != '':
             test_text = full_text[i]
             break
