@@ -17,5 +17,4 @@ def test_preprocessing_removes_header():
         test_text = line
         if test_text != '':
             break
-    print(test_text)
     assert test_text == '発明の名称取付装置および電子機器'
