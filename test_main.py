@@ -9,7 +9,7 @@ def test_1():
 
 
 def test_preprocessing_removes_header():
-    output_text = '''整理番号:46G094257A 特願2014-266299
+    test_text = '''整理番号:46G094257A 特願2014-266299
     (Proof)
     提出日:平成26年12月26日
     1
@@ -20,12 +20,13 @@ def test_preprocessing_removes_header():
     本発明の実施形態は、取付装置および電子機器に関する。
     【背景技術】
     【０００２】
-    従来、ユーザの体表に取り付けた状態で動作させる電子機器が知られている。'''
-    full_text = preprocess(output_text, 'ja').split('\n')
+    従来、ユーザの体表に取り付けた状態で動作させる電子機器が知られている。'''.split('\n')
+    test_text = environ.get('env_source_text').split('\n')
+    full_text = preprocess(test_text, 'ja').split('\n')
     for i in range(len(full_text)):
         if full_text[i] != '':
-            output_text = full_text[i]
+            test_text = full_text[i]
             break
-    assert output_text == '発明の名称取付装置および電子機器'
+    assert test_text == '発明の名称取付装置および電子機器'
 
 

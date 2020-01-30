@@ -15,8 +15,6 @@ reg = re.compile(r'^\s*[A-Za-z0-9①-㊿]+\.|^\s*[ㄱ-ㅎ\s가-힣]\.|^\s*[MDCLX
 
 
 def preprocess(full_text, lang):
-    _text = ''
-    _text = '\n'.join(full_text)
     # Make sure all characters are half-width
     refiner = Refiner(os.path.join('.', 'regex.txt'))
     _text = refiner.convert_text(full_text)
