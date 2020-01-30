@@ -10,8 +10,8 @@ from refine import Refiner
 
 jp_zh_sent_tokenizer = RegexpTokenizer('[^！？?!。]*[！？!?。]')
 reg = re.compile(r'^\s*[A-Za-z0-9①-㊿]+\.|^\s*[ㄱ-ㅎ\s가-힣]\.|^\s*[MDCLXVI]+\.|^\s*[ぁ-んァ-ン]\.')
-punkt = nltk.data.load('tokenizers/punkt/english.pickle')
-punkt._params.abbrev_types.update(['al', 'etc', 'approx', 'cf', 'p.a', 'no', 'mar', 'apr', 'may', 'jun', 'jul'])
+# punkt = nltk.data.load('tokenizers/punkt/english.pickle')
+# punkt._params.abbrev_types.update(['al', 'etc', 'approx', 'cf', 'p.a', 'no', 'mar', 'apr', 'may', 'jun', 'jul'])
 
 
 def preprocess(full_text, lang):
@@ -32,17 +32,17 @@ def preprocess(full_text, lang):
         _text = re.sub(r'[【】]|^\s*\n$|\u3000', '', _text)
         # Remove everything before the title label
         _text = re.sub(r'^[\S\s]*明\s*細\s*書$', '', _text ,flags= re.MULTILINE)
-    elif lang == 'en':
-        # Remove text that is unique to the English document
-        _text = re.sub(
-            r' {2,} |^\w*\d+\s*$|This application is based upon(.*)herein by reference.|CROSS-REFERENCE(.*)APPLICATION|\[\d+\]|^\s*\d+\.', '',
-            _text, flags=re.MULTILINE | re.IGNORECASE)
-        # Fix Fig. 1 being separated by removing the space
-        _text = re.sub(r'FIG.\s+', 'FIG.', _text, flags=re.IGNORECASE)
-        _text = re.sub(r'FIGS.\s+', 'FIGS.', _text, flags=re.IGNORECASE)
-        # Fix Titles that have have no spaces after them
-        _text = re.sub(r'([A-Z]{3,}\b)\n', r'\1 ', _text)
-    _text = replace_bracketed_punctuation(_text)
+    # elif lang == 'en':
+    #     # Remove text that is unique to the English document
+    #     _text = re.sub(
+    #         r' {2,} |^\w*\d+\s*$|This application is based upon(.*)herein by reference.|CROSS-REFERENCE(.*)APPLICATION|\[\d+\]|^\s*\d+\.', '',
+    #         _text, flags=re.MULTILINE | re.IGNORECASE)
+    #     # Fix Fig. 1 being separated by removing the space
+    #     _text = re.sub(r'FIG.\s+', 'FIG.', _text, flags=re.IGNORECASE)
+    #     _text = re.sub(r'FIGS.\s+', 'FIGS.', _text, flags=re.IGNORECASE)
+    #     # Fix Titles that have have no spaces after them
+    #     _text = re.sub(r'([A-Z]{3,}\b)\n', r'\1 ', _text)
+    # _text = replace_bracketed_punctuation(_text)
     return _text
 
 
