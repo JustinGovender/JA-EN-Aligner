@@ -40,7 +40,7 @@ jobs:
             python3 -m venv venv
             . venv/bin/activate
             echo import nltk
-            echo nltk.download('punkt'
+            echo nltk.download\(\'punkt\'\)
 
 
       - save_cache:
