@@ -11,6 +11,7 @@ def test_1():
 def test_2():
     test_text = ''
     full_text = environ.get('env_source_text')
+    print(full_text)
     processed_text = preprocess(full_text, 'ja').split('\n')
     for line in processed_text:
         test_text = line
