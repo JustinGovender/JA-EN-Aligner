@@ -22,6 +22,7 @@ def test_preprocessing_removes_header():
     【０００２】
     従来、ユーザの体表に取り付けた状態で動作させる電子機器が知られている。'''.split('\n')
     full_text = preprocess(test_text, 'ja').split('\n')
+    # pls
     for i in range(len(full_text)):
         if full_text[i] != '':
             test_text = full_text[i]
