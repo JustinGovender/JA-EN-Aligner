@@ -11,7 +11,6 @@ from Bleualign.align import Aligner
 from pdf_parser import PdfParser
 import re
 
-
 GOOGLE_SPLIT_SIZE = 100
 
 
@@ -25,7 +24,6 @@ def make_full_text(dict_list):
 
 def make_sentences(text, lang):
     source_text = []
-    # text = [value['text'] for value in text if value['text']]
     for sent in sentence_tokenize(text, lang):
         source_text.append(sent)
     return source_text
@@ -33,6 +31,16 @@ def make_sentences(text, lang):
 
 def dict_to_list(dict, key):
     return [value[key] for value in dict if value[key]]
+
+
+def get_text(file):
+    if os.path.splitext(file)[-1].lower() == '.pdf':
+        parser = PdfParser()
+        source_list = parser.get_text_from_pdf(file, False).split('\n')
+    elif os.path.splitext(file)[-1].lower() == '.docx':
+        source_dict_list = process(file)
+        source_list = dict_to_list(source_dict_list, 'text')
+    return source_list
 
 
 def write_cells(sources, targets, source_lang, target_lang):
@@ -66,6 +74,7 @@ def make_google_reference_list(source_list, source_lang, target_lang):
 
     return reference_list
 
+
 def fix_ja_english_words(ja_list, en_list):
     replacement_dict = {}
     matches = []
@@ -96,12 +105,8 @@ def fix_ja_english_words(ja_list, en_list):
                     if replacement_word is not None:
                         # Add to dictionary
                         replacement_dict[word] = replacement_word
-                        #Replace word in original list
+                        # Replace word in original list
                         ja_list[i] = re.sub(word, replacement_word, ja_list[i])
-
-
-
-
 
 
 def align_sentences(source_list, target_list, reference_list):
@@ -112,27 +117,12 @@ def align_sentences(source_list, target_list, reference_list):
 
 def generate_pairs(source_lang, target_lang, source_file, target_file, srctotarget_file, is_reference_save):
     # process file format into dictionary
-    if os.path.splitext(source_file)[1].lower() == '.pdf':
-        parser = PdfParser()
-        source_list = parser.get_text_from_pdf(source_file, False).split('\n')
-        source_list = make_sentences(source_list, source_lang)
-    else:
-        # Default is docx
-        source_dict_list = process(source_file)
-        source_list = dict_to_list(source_dict_list, 'text')
-        source_list = make_sentences(source_list, source_lang)
-    if os.path.splitext(target_file)[1].lower() == '.pdf':
-        parser = PdfParser()
-        target_list = parser.get_text_from_pdf(target_file, False).split('\n')
-        target_list = make_sentences(target_list, target_lang)
-    else:
-        # Default is docx
-        target_dict_list = process(target_file)
-        target_list = dict_to_list(target_dict_list, 'text')
-        target_list = make_sentences(target_list, target_lang)
+    source_list = get_text(source_file)
+    target_list = get_text(target_file)
+    source_list = make_sentences(source_list, source_lang)
+    target_list = make_sentences(target_list, target_lang)
 
-
-    test_text = ' '.join(target_list) # <--------------------------------------------------------------- Debug !Remove!
+    test_text = ' '.join(target_list)  # <--------------------------------------------------------------- Debug !Remove!
 
     if srctotarget_file:
         with open(srctotarget_file, 'r') as srctotarget:
@@ -150,7 +140,7 @@ def generate_pairs(source_lang, target_lang, source_file, target_file, srctotarg
     sources, targets = align_sentences(source_list, target_list, refs)
     if source_lang is 'ja':
         fix_ja_english_words(sources, targets)
-    test_text2 = ' '.join(targets) # <--------------------------------------------------------------- Debug !Remove!
+    test_text2 = ' '.join(targets)  # <--------------------------------------------------------------- Debug !Remove!
     return sources, targets
 
 
@@ -183,5 +173,6 @@ def parse_args(argv):
 
 if __name__ == '__main__':
     args = parse_args(sys.argv)
-    sources, targets = generate_pairs(args.source_lang, args.target_lang, args.source_file, args.target_file, None, args.is_reference_save)
+    sources, targets = generate_pairs(args.source_lang, args.target_lang, args.source_file, args.target_file, None,
+                                      args.is_reference_save)
     write_cells(sources, targets, args.source_lang, args.target_lang)
