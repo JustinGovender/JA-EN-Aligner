@@ -16,7 +16,6 @@ GOOGLE_SPLIT_SIZE = 100
 
 def make_full_text(dict_list):
     text = ''
-    result = ''
     for i, element in enumerate(dict_list):
         text = text + ' ' + (element['text'])
     return text
@@ -122,8 +121,6 @@ def generate_pairs(source_lang, target_lang, source_file, target_file, srctotarg
     source_list = make_sentences(source_list, source_lang)
     target_list = make_sentences(target_list, target_lang)
 
-    test_text = ' '.join(target_list)  # <--------------------------------------------------------------- Debug !Remove!
-
     if srctotarget_file:
         with open(srctotarget_file, 'r') as srctotarget:
             reference_list = srctotarget.readlines()
@@ -140,7 +137,6 @@ def generate_pairs(source_lang, target_lang, source_file, target_file, srctotarg
     sources, targets = align_sentences(source_list, target_list, refs)
     if source_lang is 'ja':
         fix_ja_english_words(sources, targets)
-    test_text2 = ' '.join(targets)  # <--------------------------------------------------------------- Debug !Remove!
     return sources, targets
 
 
